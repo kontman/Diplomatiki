@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+
+
 const QUESTION_TIME = 15
 const MAX_SCORE = 1000
 
@@ -34,7 +36,12 @@ export default function PlayQuizPage() {
   const [showAnswer, setShowAnswer] = useState(false)
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIME)
 
+  
+
+
+  // 👉 Φόρτωση του quiz
   useEffect(() => {
+    document.title = `play`
     const fetchQuiz = async () => {
       const { data } = await supabase
         .from('quizzes')
@@ -50,27 +57,14 @@ export default function PlayQuizPage() {
     }
 
     if (quizId) fetchQuiz()
-  }, [quizId])
-
-  useEffect(() => {
-    //if (!quizId) return
 
     const channel = supabase
       .channel(`quiz-${quizId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'quizzes',
-          filter: `id=eq.${quizId}`,
-        },
-        (payload) => {
-          const updated = payload.new as Quiz
-          setQuizStarted(updated.started)
-          setQuizFinished(updated.status === 'finished')
-        }
-      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'quizzes', filter: `id=eq.${quizId}` }, (payload) => {
+        const updated = payload.new as Quiz
+        setQuizStarted(updated.started)
+        setQuizFinished(updated.status === 'finished')
+      })
       .subscribe()
 
     return () => {
@@ -78,28 +72,27 @@ export default function PlayQuizPage() {
     }
   }, [quizId])
 
+  // 👉 Timer
   useEffect(() => {
-    if (!showAnswer && timeLeft > 0 && quizStarted) {
-      const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
-      return () => clearTimeout(timer)
-    }
-
-    if (timeLeft === 0 && !showAnswer) {
+    if (!quizStarted || showAnswer || quizFinished) return
+    if (timeLeft === 0) {
       setShowAnswer(true)
-      setSelectedAnswer(null)
+      return
     }
-  }, [timeLeft, showAnswer, quizStarted])
 
+    const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [timeLeft, showAnswer, quizStarted, quizFinished])
+
+  // 👉 Επιλογή απάντησης
   const handleAnswer = async (index: number) => {
-    if (showAnswer || !playerCode || !quiz) return
+    if (!quiz || !playerCode || showAnswer) return
 
     setSelectedAnswer(index)
     setShowAnswer(true)
 
-    const question = quiz?.questions[currentIndex]
+    const question = quiz.questions[currentIndex]
     if (index === question.correctIndex) {
-      const scoreEarned = Math.floor((timeLeft / QUESTION_TIME) * MAX_SCORE)
-
       const { data } = await supabase
         .from('players')
         .select('score')
@@ -108,7 +101,7 @@ export default function PlayQuizPage() {
         .single()
 
       if (data) {
-        const newScore = data.score + scoreEarned
+        const newScore = data.score + Math.floor((timeLeft / QUESTION_TIME) * MAX_SCORE)
         await supabase
           .from('players')
           .update({ score: newScore })
@@ -118,42 +111,24 @@ export default function PlayQuizPage() {
     }
   }
 
+  // 👉 Επόμενη ερώτηση ή Τέλος κουίζ
   const nextQuestion = async () => {
-    console.log("DEBUG quiz/playerCode/quizId:", quiz, playerCode, quizId)
-    if (!quiz || !quizId || !playerCode) return
+    if (!quiz || !playerCode) return
 
-    const nextIndex = currentIndex + 1
-
-    if (nextIndex >= quiz.questions.length) {
-      console.log("⏹️ Παίκτης ολοκλήρωσε το κουίζ — προσπαθώ update...")
-
-      // Player finished
-      const { error } = await supabase
+    if (currentIndex + 1 >= quiz.questions.length) {
+      // Ολοκλήρωση παίκτη
+      await supabase
         .from('players')
         .update({ finished: true })
         .eq('quiz_id', quizId)
-        .eq('player_code', playerCode.toString())
+        .eq('player_code', playerCode)
 
-        if (error) {
-          console.error('❌ Σφάλμα στο update του player:', error)
-        } else {
-          console.log('DEBUG quizId:', quizId)
-          console.log('DEBUG playerCode:', typeof (playerCode))
-
-          console.log('✅ Ο παίκτης ενημερώθηκε ως finished')
-        }
-
-        console.log("⏹️ Παίκτης ολοκλήρωσε το κουίζ — προσπαθώ update22...")
-
-
-      // Check if all players are finished
       const { data: allPlayers } = await supabase
         .from('players')
         .select('finished')
         .eq('quiz_id', quizId)
 
-      const allFinished = allPlayers?.every((p) => p.finished === true)
-
+      const allFinished = allPlayers?.every((p) => p.finished)
       if (allFinished) {
         await supabase
           .from('quizzes')
@@ -165,90 +140,72 @@ export default function PlayQuizPage() {
       return
     }
 
-    // Next question
+    setCurrentIndex((prev) => prev + 1)
     setSelectedAnswer(null)
     setShowAnswer(false)
-    setCurrentIndex(nextIndex)
     setTimeLeft(QUESTION_TIME)
   }
 
-  if (!quiz) return <p className="p-6">Φόρτωση...</p>
-
-  if (quizFinished) {
-    return (
-      <div className="p-6 text-center">
-        <h1 className="text-2xl font-bold mb-4">{quiz.title}</h1>
-        <p className="text-lg text-green-700 font-semibold">
-          Το κουίζ έχει ολοκληρωθεί 🎉
-        </p>
-      </div>
-    )
-  }
-
-  if (!quizStarted) {
-    return (
-      <div className="p-6 text-center">
-        <p className="text-xl font-semibold">
-          Αναμονή για έναρξη από τον host...
-        </p>
-      </div>
-    )
-  }
+  if (!quiz || !playerCode) return <p className="p-6">Φόρτωση...</p>
+  if (!quizStarted) return <p className="text-center text-xl">🕓 Αναμονή για έναρξη από τον host...</p>
+  if (quizFinished) return <p className="text-center text-2xl mt-10">🎉 Το κουίζ ολοκληρώθηκε!</p>
 
   const question = quiz.questions[currentIndex]
-  const isCorrect = selectedAnswer === question.correctIndex
+
+
+  
+   
+  
+
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-xl font-bold mb-4">{quiz.title}</h1>
+    <div className="max-w-xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">{quiz.title}</h1>
 
       <div className="mb-4">
-        <p className="text-lg font-medium">
-          Ερώτηση {currentIndex + 1} / {quiz.questions.length}
-        </p>
-        <p className="text-gray-700">{question.questionText}</p>
-        <p className="text-sm text-gray-500">Χρόνος: {timeLeft}s</p>
+        <p>Ερώτηση {currentIndex + 1} / {quiz.questions.length}</p>
+        <p className="text-gray-700 mt-2">{question.questionText}</p>
+        <p className="text-gray-500 text-sm mt-1">⏳ {timeLeft}s</p>
       </div>
 
-      <div className="space-y-2">
-        {question.options.map((option, i) => {
+      <div className="space-y-2 mt-4">
+        {question.options.map((opt, i) => {
           const isSelected = selectedAnswer === i
-          const isCorrectAnswer = i === question.correctIndex
+          const isCorrect = i === question.correctIndex
 
           return (
             <button
               key={i}
-              disabled={showAnswer}
               onClick={() => handleAnswer(i)}
-              className={`w-full text-left px-4 py-2 border rounded ${
+              disabled={showAnswer}
+              className={`block w-full px-4 py-2 rounded border ${
                 showAnswer
-                  ? isCorrectAnswer
-                    ? 'bg-green-200 border-green-600'
+                  ? isCorrect
+                    ? 'bg-green-200'
                     : isSelected
-                    ? 'bg-red-200 border-red-600'
+                    ? 'bg-red-300'
                     : 'opacity-50'
-                  : 'hover:bg-gray-100'
+                  : 'bg-white hover:bg-gray-100'
               }`}
             >
-              {option}
+              {opt}
             </button>
           )
         })}
       </div>
 
       {showAnswer && (
-        <div className="mt-4">
-          {isCorrect ? (
+        <div className="mt-6 text-center">
+          {selectedAnswer === question.correctIndex ? (
             <p className="text-green-600 font-semibold">Σωστό!</p>
           ) : (
             <p className="text-red-600 font-semibold">Λάθος απάντηση.</p>
           )}
-
           <button
             onClick={nextQuestion}
-            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            Επόμενη Ερώτηση
+            {currentIndex + 1 === quiz.questions.length ? 'Ολοκλήρωση Κουίζ' : 'Επόμενη Ερώτηση'}
           </button>
         </div>
       )}

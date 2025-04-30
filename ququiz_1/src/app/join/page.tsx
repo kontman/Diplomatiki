@@ -1,100 +1,129 @@
-
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function JoinPage() {
-  const [playerCode, setPlayerCode] = useState('')
-  const [shortCode, setShortCode] = useState('')
-  const [quizId, setQuizId] = useState<string | null>(null)
-  const [quizTitle, setQuizTitle] = useState('')
-  const [error, setError] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  const [shortId, setShortId] = useState('')
+  const [playerName, setPlayerName] = useState('')
+  const [error, setError] = useState('')
+
   useEffect(() => {
-    const id = searchParams.get('quizId')
-    if (id) {
-      setQuizId(id)
-      fetchQuizDetails(id)
+    document.title = 'Συμμετοχή'
+    const quizIdFromLink = searchParams.get('quizId')
+    if (quizIdFromLink) {
+      setShortId(quizIdFromLink)
     }
   }, [searchParams])
 
-  const fetchQuizDetails = async (quizId: string) => {
-    const { data } = await supabase
-      .from('quizzes')
-      .select('short_id, title')
-      .eq('id', quizId)
-      .single()
-    if (data) {
-      setQuizTitle(data.title)
-    }
-  }
-
-  const handleJoin = async () => {
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault()
     setError('')
-    const code = playerCode.trim()
 
-    if (!/^\d{7}$/.test(code)) {
-      setError('Ο κωδικός παίκτη πρέπει να είναι ακριβώς 7 ψηφία.')
+    if (!/^\d{7}$/.test(playerName)) {
+      setError('Το όνομα παίκτη πρέπει να είναι ακριβώς 7 ψηφία.')
       return
     }
 
-    let resolvedQuizId = quizId
+    if (shortId.length !== 4 && shortId.length !== 36) {
+      setError('Ο κωδικός Quiz πρέπει να είναι 4 ψηφία ή πλήρες ID.')
+      return
+    }
 
-    if (!resolvedQuizId && shortCode) {
-      const { data } = await supabase
+    // Αν έχει ήδη το quizId, χρησιμοποίησέ το απευθείας
+    let quizId = shortId
+
+    // Αν είναι 4ψηφιο short ID, βρες το quizId
+    if (shortId.length === 4) {
+      const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
         .select('id')
-        .eq('short_id', shortCode.trim())
+        .eq('short_id', shortId)
         .single()
-      if (!data) {
-        setError('Το quiz δεν βρέθηκε.')
+
+      if (!quiz || quizError) {
+        setError('Δεν βρέθηκε Quiz με αυτόν τον κωδικό.')
         return
       }
-      resolvedQuizId = data.id
+
+      quizId = quiz.id
     }
 
-    const { data: existing } = await supabase
+    // Έλεγχος αν ήδη υπάρχει ο παίκτης
+    const { data: existingPlayer } = await supabase
       .from('players')
       .select('id')
-      .eq('player_code', code)
-      .eq('quiz_id', resolvedQuizId)
+      .eq('quiz_id', quizId)
+      .eq('player_code', playerName)
+      .single()
 
-    if (existing && existing.length > 0) {
-      setError('Αυτός ο κωδικός έχει ήδη χρησιμοποιηθεί.')
+    if (existingPlayer) {
+      setError('Αυτός ο κωδικός παίκτη χρησιμοποιείται ήδη ή υπάρχει σφάλμα.')
       return
     }
 
-    await supabase.from('players').insert([{
-      quiz_id: resolvedQuizId,
-      player_code: code,
-      score: 0,
-    }])
+    // Δημιουργία παίκτη
+    const { error: insertError } = await supabase
+      .from('players')
+      .insert({
+        player_code: playerName,
+        quiz_id: quizId,
+        score: 0,
+        finished: false
+      })
 
-    router.push(`/waiting-room?quizId=${resolvedQuizId}&player=${code}`)
+    if (insertError) {
+      console.error(insertError)
+      setError('Αποτυχία καταχώρησης παίκτη.')
+      return
+    }
+
+    router.push(`/play/${quizId}?player=${encodeURIComponent(playerName)}`)
   }
 
   return (
-    <div className="max-w-md mx-auto p-6 text-center">
-      <h1 className="text-2xl font-bold mb-4">{quizTitle || 'Συμμετοχή σε Κουίζ'}</h1>
-      <input
-        type="text"
-        placeholder="7ψήφιο όνομα παίκτη"
-        value={playerCode}
-        onChange={(e) => setPlayerCode(e.target.value)}
-        className="w-full border p-2 rounded mb-4 text-center"
-        maxLength={7}
-      />
-      <button
-        onClick={handleJoin}
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-      >
-        Έναρξη
-      </button>
-      {error && <p className="text-red-600 mt-2 text-sm">{error}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-6 text-center">🎮 Συμμετοχή σε Quiz</h1>
+
+        <form onSubmit={handleJoin} className="space-y-4">
+          <div>
+            <label className="block mb-1 font-medium">Κωδικός Quiz:</label>
+            <input
+              type="text"
+              value={shortId}
+              onChange={(e) => setShortId(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Όνομα Παίκτη (7 ψηφία):</label>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full border rounded px-3 py-2"
+              required
+              maxLength={7}
+            />
+          </div>
+
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
+          >
+            Συμμετοχή
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

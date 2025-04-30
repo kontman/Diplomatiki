@@ -1,21 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function CreateQuizPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const quizId = searchParams.get('id')
-
   const [title, setTitle] = useState('')
   const [questions, setQuestions] = useState<any[]>([])
   const [currentQuestion, setCurrentQuestion] = useState('')
   const [currentOptions, setCurrentOptions] = useState(['', ''])
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+
+
+  
 
   // ✅ Check login
   useEffect(() => {
@@ -29,31 +29,6 @@ export default function CreateQuizPage() {
     }
     checkUser()
   }, [router])
-
-  // ✅ Αν υπάρχει id, φόρτωσε quiz
-  useEffect(() => {
-    if (!quizId) {
-      setLoading(false)
-      return
-    }
-
-    const fetchQuiz = async () => {
-      const { data, error } = await supabase
-        .from('quizzes')
-        .select('title, questions')
-        .eq('id', quizId)
-        .single()
-
-      if (data && !error) {
-        setTitle(data.title)
-        setQuestions(data.questions || [])
-      }
-
-      setLoading(false)
-    }
-
-    fetchQuiz()
-  }, [quizId])
 
   const addQuestion = () => {
     if (!currentQuestion || currentOptions.some(opt => opt === '') || correctIndex === null) {
@@ -93,9 +68,7 @@ export default function CreateQuizPage() {
   }
 
   const addOption = () => {
-    if (currentOptions.length < 4) {
-      setCurrentOptions([...currentOptions, ''])
-    }
+    if (currentOptions.length < 4) setCurrentOptions([...currentOptions, ''])
   }
 
   const removeOption = (index: number) => {
@@ -103,7 +76,6 @@ export default function CreateQuizPage() {
       const updated = [...currentOptions]
       updated.splice(index, 1)
       setCurrentOptions(updated)
-
       if (correctIndex !== null && correctIndex >= index) {
         setCorrectIndex(correctIndex - 1)
       }
@@ -116,64 +88,33 @@ export default function CreateQuizPage() {
       return
     }
 
-    if (quizId) {
-      // ✏️ UPDATE υπάρχον quiz
-      const { error } = await supabase
-        .from('quizzes')
-        .update({ title, questions })
-        .eq('id', quizId)
+    const shortId = Math.floor(1000 + Math.random() * 9000).toString()
 
-      if (!error) {
-        router.push('/host')
-      } else {
-        console.error('❌ Σφάλμα ενημέρωσης:', error)
-      }
+    const { data, error } = await supabase
+      .from('quizzes')
+      .insert({
+        title,
+        questions,
+        short_id: shortId,
+        status: 'waiting',
+        started: false,
+        host_id: userId,
+      })
+      .select()
+      .single()
+
+    if (!error && data) {
+      router.push('/host')
     } else {
-      // ➕ Νέο quiz
-      const shortId = Math.floor(1000 + Math.random() * 9000).toString()
-
-      const { error } = await supabase
-        .from('quizzes')
-        .insert({
-          title,
-          questions,
-          short_id: shortId,
-          status: 'waiting',
-          started: false,
-          host_id: userId,
-        })
-
-      if (!error) {
-        router.push('/host')
-      } else {
-        console.error('❌ Σφάλμα δημιουργίας:', error)
-      }
+      console.error('❌ Σφάλμα δημιουργίας:', error)
     }
   }
-
-  const handleClear = () => {
-    if (confirm('Θα διαγραφούν όλες οι τρέχουσες ερωτήσεις. Συνέχεια;')) {
-      setQuestions([])
-      setCurrentQuestion('')
-      setCurrentOptions(['', ''])
-      setCorrectIndex(null)
-      setTitle('')
-    }
-  }
-
-  if (loading) return <p className="p-6">Φόρτωση...</p>
 
   return (
+   
+    
     <div className="max-w-3xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">📝 Δημιουργία Κουίζ</h1>
-        <button
-          onClick={handleClear}
-          className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
-        >
-          🧹 Καθαρισμός
-        </button>
-      </div>
+      <h1 className="text-2xl font-bold mb-4 text-center">📝 Δημιουργία Κουίζ</h1>
 
       <input
         type="text"
@@ -211,12 +152,7 @@ export default function CreateQuizPage() {
               title="Σωστή απάντηση"
             />
             {currentOptions.length > 2 && (
-              <button
-                onClick={() => removeOption(index)}
-                className="text-red-500"
-              >
-                ✖
-              </button>
+              <button onClick={() => removeOption(index)} className="text-red-500">✖</button>
             )}
           </div>
         ))}
@@ -273,8 +209,11 @@ export default function CreateQuizPage() {
         onClick={handleSubmit}
         className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
       >
-        ✅ Ολοκλήρωση και Αποθήκευση
+        ✅ Ολοκλήρωση και Επιστροφή
       </button>
     </div>
+  
+
+ 
   )
 }

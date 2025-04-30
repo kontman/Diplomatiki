@@ -11,6 +11,7 @@ export default function WaitingRoomPage() {
   const playerCode = searchParams.get('player')
 
   useEffect(() => {
+    document.title =`waiting room`
     const channel = supabase
       .channel(`quiz-status-${quizId}`)
       .on('postgres_changes', {
