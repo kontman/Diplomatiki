@@ -25,6 +25,7 @@ export default function HostQuizPage() {
   const [showPlayers, setShowPlayers] = useState(true)
   const [completedCount, setCompletedCount] = useState(0)
 
+  document.title = quizTitle
   useEffect(() => {
     const fetchAll = async () => {
       const { data: quiz } = await supabase
@@ -112,7 +113,7 @@ export default function HostQuizPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-center mb-6">{quizTitle}</h1>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 mb-6">

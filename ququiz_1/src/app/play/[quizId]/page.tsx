@@ -4,15 +4,11 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-
-
-const QUESTION_TIME = 15
-const MAX_SCORE = 1000
-
 type Question = {
   questionText: string
   options: string[]
   correctIndex: number
+  duration: number
 }
 
 type Quiz = {
@@ -34,14 +30,21 @@ export default function PlayQuizPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME)
-
+  const [timeLeft, setTimeLeft] = useState(0)
   
 
 
-  // 👉 Φόρτωση του quiz
+
   useEffect(() => {
-    document.title = `play`
+    if (quiz && quizStarted) {
+      document.title = `Play | ${quiz.title}`
+    }
+  }, [quiz, quizStarted])
+
+  
+  
+  // 📥 Φόρτωση κουίζ
+  useEffect(() => {
     const fetchQuiz = async () => {
       const { data } = await supabase
         .from('quizzes')
@@ -53,14 +56,23 @@ export default function PlayQuizPage() {
         setQuiz(data)
         setQuizStarted(data.started)
         setQuizFinished(data.status === 'finished')
+        setTimeLeft(data.questions[0]?.duration || 15)
       }
     }
 
     if (quizId) fetchQuiz()
+  }, [quizId])
 
+  // 🔁 Realtime updates
+  useEffect(() => {
     const channel = supabase
       .channel(`quiz-${quizId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'quizzes', filter: `id=eq.${quizId}` }, (payload) => {
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'quizzes',
+        filter: `id=eq.${quizId}`,
+      }, (payload) => {
         const updated = payload.new as Quiz
         setQuizStarted(updated.started)
         setQuizFinished(updated.status === 'finished')
@@ -72,27 +84,29 @@ export default function PlayQuizPage() {
     }
   }, [quizId])
 
-  // 👉 Timer
+  // ⏲️ Χρονόμετρο
   useEffect(() => {
     if (!quizStarted || showAnswer || quizFinished) return
-    if (timeLeft === 0) {
-      setShowAnswer(true)
-      return
-    }
+    if (timeLeft === 0) return setShowAnswer(true)
 
     const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
     return () => clearTimeout(timer)
   }, [timeLeft, showAnswer, quizStarted, quizFinished])
 
-  // 👉 Επιλογή απάντησης
   const handleAnswer = async (index: number) => {
-    if (!quiz || !playerCode || showAnswer) return
+    if (showAnswer || !playerCode || !quiz) return
+
+    const question = quiz.questions[currentIndex]
+    const duration = question.duration || 15
+    const isCorrect = index === question.correctIndex
+    const timeUsed = duration - timeLeft
+    const rawScore = ((duration - timeUsed) / duration) * 100
+    const earned = isCorrect ? Math.floor(rawScore) : 0
 
     setSelectedAnswer(index)
     setShowAnswer(true)
 
-    const question = quiz.questions[currentIndex]
-    if (index === question.correctIndex) {
+    if (earned > 0) {
       const { data } = await supabase
         .from('players')
         .select('score')
@@ -100,23 +114,22 @@ export default function PlayQuizPage() {
         .eq('player_code', playerCode)
         .single()
 
-      if (data) {
-        const newScore = data.score + Math.floor((timeLeft / QUESTION_TIME) * MAX_SCORE)
-        await supabase
-          .from('players')
-          .update({ score: newScore })
-          .eq('quiz_id', quizId)
-          .eq('player_code', playerCode)
-      }
+      const current = data?.score || 0
+
+      await supabase
+        .from('players')
+        .update({ score: current + earned })
+        .eq('quiz_id', quizId)
+        .eq('player_code', playerCode)
     }
   }
 
-  // 👉 Επόμενη ερώτηση ή Τέλος κουίζ
   const nextQuestion = async () => {
-    if (!quiz || !playerCode) return
+    if (!quiz || !playerCode || !quizId) return
 
-    if (currentIndex + 1 >= quiz.questions.length) {
-      // Ολοκλήρωση παίκτη
+    const nextIndex = currentIndex + 1
+
+    if (nextIndex >= quiz.questions.length) {
       await supabase
         .from('players')
         .update({ finished: true })
@@ -128,7 +141,7 @@ export default function PlayQuizPage() {
         .select('finished')
         .eq('quiz_id', quizId)
 
-      const allFinished = allPlayers?.every((p) => p.finished)
+      const allFinished = allPlayers?.every(p => p.finished)
       if (allFinished) {
         await supabase
           .from('quizzes')
@@ -140,72 +153,85 @@ export default function PlayQuizPage() {
       return
     }
 
-    setCurrentIndex((prev) => prev + 1)
+    setCurrentIndex(nextIndex)
     setSelectedAnswer(null)
     setShowAnswer(false)
-    setTimeLeft(QUESTION_TIME)
+    setTimeLeft(quiz.questions[nextIndex].duration || 15)
   }
 
   if (!quiz || !playerCode) return <p className="p-6">Φόρτωση...</p>
-  if (!quizStarted) return <p className="text-center text-xl">🕓 Αναμονή για έναρξη από τον host...</p>
-  if (quizFinished) return <p className="text-center text-2xl mt-10">🎉 Το κουίζ ολοκληρώθηκε!</p>
+
+  if (!quizStarted) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-xl font-semibold">Αναμονή για έναρξη από τον host...</p>
+      </div>
+    )
+  }
+
+  if (quizFinished) {
+    return (
+      <div className="p-6 text-center">
+        <h1 className="text-2xl font-bold mb-4">{quiz.title}</h1>
+        <p className="text-lg text-green-700 font-semibold">Το κουίζ έχει ολοκληρωθεί 🎉</p>
+      </div>
+    )
+  }
 
   const question = quiz.questions[currentIndex]
-
-
-  
-   
-  
-
+  const isCorrect = selectedAnswer === question.correctIndex
 
   return (
-    <div className="max-w-xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">{quiz.title}</h1>
+    <div className="max-w-2xl mx-auto p-6">
+      <h1 className="text-xl font-bold mb-4">{quiz.title}</h1>
 
       <div className="mb-4">
-        <p>Ερώτηση {currentIndex + 1} / {quiz.questions.length}</p>
-        <p className="text-gray-700 mt-2">{question.questionText}</p>
-        <p className="text-gray-500 text-sm mt-1">⏳ {timeLeft}s</p>
+        <p className="text-lg font-medium">
+          Ερώτηση {currentIndex + 1} / {quiz.questions.length}
+        </p>
+        <p className="text-gray-700">{question.questionText}</p>
+        <p className="text-sm text-gray-500">Χρόνος: {timeLeft}s</p>
       </div>
 
-      <div className="space-y-2 mt-4">
-        {question.options.map((opt, i) => {
+      <div className="space-y-2">
+        {question.options.map((option, i) => {
           const isSelected = selectedAnswer === i
-          const isCorrect = i === question.correctIndex
+          const isCorrectAnswer = i === question.correctIndex
 
           return (
             <button
               key={i}
-              onClick={() => handleAnswer(i)}
               disabled={showAnswer}
-              className={`block w-full px-4 py-2 rounded border ${
+              onClick={() => handleAnswer(i)}
+              className={`w-full text-left px-4 py-2 border rounded ${
                 showAnswer
-                  ? isCorrect
-                    ? 'bg-green-200'
+                  ? isCorrectAnswer
+                    ? 'bg-green-200 border-green-600'
                     : isSelected
-                    ? 'bg-red-300'
+                    ? 'bg-red-200 border-red-600'
                     : 'opacity-50'
-                  : 'bg-white hover:bg-gray-100'
+                  : 'hover:bg-gray-100'
               }`}
             >
-              {opt}
+              {option}
             </button>
           )
         })}
       </div>
 
       {showAnswer && (
-        <div className="mt-6 text-center">
-          {selectedAnswer === question.correctIndex ? (
+        <div className="mt-4">
+          {isCorrect ? (
             <p className="text-green-600 font-semibold">Σωστό!</p>
           ) : (
             <p className="text-red-600 font-semibold">Λάθος απάντηση.</p>
           )}
+
           <button
             onClick={nextQuestion}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
           >
-            {currentIndex + 1 === quiz.questions.length ? 'Ολοκλήρωση Κουίζ' : 'Επόμενη Ερώτηση'}
+            {currentIndex + 1 < quiz.questions.length ? 'Επόμενη Ερώτηση' : 'Ολοκλήρωση Κουίζ'}
           </button>
         </div>
       )}

@@ -13,7 +13,7 @@ export default function JoinPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    document.title = 'Συμμετοχή'
+    document.title = 'Join'
     const quizIdFromLink = searchParams.get('quizId')
     if (quizIdFromLink) {
       setShortId(quizIdFromLink)
