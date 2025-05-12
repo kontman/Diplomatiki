@@ -99,6 +99,7 @@ export default function JoinPage() {
               onChange={(e) => setShortId(e.target.value)}
               className="w-full border rounded px-3 py-2"
               required
+              maxLength={4}
             />
           </div>
 

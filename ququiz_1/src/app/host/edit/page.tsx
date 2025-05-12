@@ -4,24 +4,59 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function CreateQuizPage() {
+export default function EditQuizPage() {
   const [title, setTitle] = useState('')
   const [questions, setQuestions] = useState<any[]>([])
   const [currentQuestion, setCurrentQuestion] = useState('')
   const [currentOptions, setCurrentOptions] = useState(['', ''])
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
   const [currentDuration, setCurrentDuration] = useState<number>(15)
+  const [quizId, setQuizId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const router = useRouter()
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      document.title = 'Create';
-    }
-  }, []);
-  
+ 
 
+  // Φόρτωση δεδομένων από το localStorage
   useEffect(() => {
+    const fetchData = () => {
+      const quizIdFromStorage = localStorage.getItem('edit_quiz_id')
+      if (!quizIdFromStorage) {
+        router.push('/host') // Αν δεν υπάρχει ID κουίζ, ανακατευθύνουμε στο Dashboard
+        return
+      }
+
+      setQuizId(quizIdFromStorage)
+
+      // Φόρτωση του τίτλου και των ερωτήσεων από το localStorage
+      const quizTitle = localStorage.getItem('edit_quiz_title')
+      const quizQuestions = localStorage.getItem('edit_quiz_questions')
+
+      if (quizTitle && quizQuestions) {
+        setTitle(quizTitle)
+        setQuestions(JSON.parse(quizQuestions))
+      } else {
+        // Αν δεν υπάρχουν δεδομένα στο localStorage, φορτώνουμε από τη βάση δεδομένων
+        const fetchQuiz = async () => {
+          const { data } = await supabase
+            .from('quizzes')
+            .select('title, questions')
+            .eq('id', quizIdFromStorage)
+            .single()
+
+          if (data) {
+            setTitle(data.title)
+            setQuestions(data.questions)
+          }
+        }
+
+        fetchQuiz()
+      }
+    }
+
+    fetchData()
+
+    // Αν ο χρήστης δεν είναι συνδεδεμένος, ανακατευθύνουμε στο login
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser()
       if (!data?.user) {
@@ -31,14 +66,7 @@ export default function CreateQuizPage() {
       }
     }
     checkUser()
-  
-    // Αν υπάρχουν δεδομένα στο localStorage, τα φορτώνουμε
-    const savedQuestions = localStorage.getItem('quiz_progress')
-    if (savedQuestions) {
-      setQuestions(JSON.parse(savedQuestions))
-    }
-  }, [])
-  
+  }, [router])
 
   const addQuestion = () => {
     if (
@@ -64,7 +92,7 @@ export default function CreateQuizPage() {
     setQuestions(newQuestions)
   
     // Αποθήκευση στο localStorage
-    localStorage.setItem('quiz_progress', JSON.stringify(newQuestions))
+    localStorage.setItem('edit_quiz_questions', JSON.stringify(newQuestions))
   
     // Εκκαθάριση των πεδίων για την επόμενη ερώτηση
     setCurrentQuestion('')
@@ -73,17 +101,13 @@ export default function CreateQuizPage() {
     setCurrentDuration(15)
   }
   
-  
-  
+
   const removeQuestion = (index: number) => {
-    // Διαγραφή της ερώτησης
-    setQuestions(prev => {
-      const updatedQuestions = prev.filter((_, i) => i !== index);
+    const updatedQuestions = questions.filter((_, i) => i !== index)
+    setQuestions(updatedQuestions)
   
-      // Αποθήκευση στο localStorage
-      localStorage.setItem('questions', JSON.stringify(updatedQuestions));
-      return updatedQuestions;
-    });
+    // Ενημέρωση στο localStorage
+    localStorage.setItem('edit_quiz_questions', JSON.stringify(updatedQuestions))
   }
   
 
@@ -118,67 +142,53 @@ export default function CreateQuizPage() {
   }
 
   const handleSubmit = async () => {
-    if (!title || questions.length === 0 || !userId) {
+    if (!title || questions.length === 0 || !userId || !quizId) {
       alert('Συμπλήρωσε τίτλο και ερωτήσεις.')
       return
     }
-  
-    // Έλεγχος για να δούμε αν υπάρχει ήδη κουίζ με τον ίδιο τίτλο
-    const { data: existingQuiz, error } = await supabase
-      .from('quizzes')
-      .select('title')
-      .eq('title', title)
-      .single()
-  
-    if (existingQuiz) {
-      // Αν υπάρχει, εμφανίζουμε μήνυμα στον χρήστη
-      alert('Υπάρχει ήδη κουίζ με αυτόν τον τίτλο. Δοκιμάστε άλλον τίτλο.')
-      return
-    }
-  
-    const shortId = Math.floor(1000 + Math.random() * 9000).toString()
-  
-    const { data, error: insertError } = await supabase
-      .from('quizzes')
-      .insert({
-        title,
-        questions,
-        short_id: shortId,
-        status: 'waiting',
-        started: false,
-        host_id: userId,
-      })
-      .select()
-      .single()
-  
-    if (!insertError && data) {
-      // Διαγραφή από το localStorage όταν ολοκληρωθεί η αποθήκευση
-      localStorage.removeItem('quiz_progress')
-      router.push('/host')
-    } else {
-      console.error('❌ Σφάλμα δημιουργίας:', insertError)
-    }
-  }
-  
-  
 
-  const clearAll = () => {
-    if (confirm('Θέλεις σίγουρα να διαγράψεις όλες τις ερωτήσεις;')) {
-      setQuestions([])
+    const { data: existingQuiz, error } = await supabase
+    .from('quizzes')
+    .select('title')
+    .eq('title', title)
+    .single()
+
+    if (existingQuiz && title !== localStorage.getItem('edit_quiz_title')) {
+        // Αν υπάρχει, εμφανίζουμε μήνυμα στον χρήστη
+        alert('Υπάρχει ήδη κουίζ με αυτόν τον τίτλο. Δοκιμάστε άλλον τίτλο.')
+        return
+    }
+  
+    try {
+      // Ενημέρωση του υπάρχοντος κουίζ (δεν δημιουργούμε νέο)
+      const { data, error } = await supabase
+        .from('quizzes')
+        .update({
+          title,
+          questions,
+          status: 'waiting',  // Προεπιλεγμένη κατάσταση
+          started: false,  // Δεν έχει ξεκινήσει
+        })
+        .eq('id', quizId) // Ενημέρωση του υπάρχοντος κουίζ βάσει ID
+  
+      if (error) {
+        throw error
+      }
+  
+      localStorage.removeItem('edit_quiz_id')  // Καθαρισμός localStorage
+      localStorage.removeItem('edit_quiz_title')
+      localStorage.removeItem('edit_quiz_questions')
+      router.push('/host')  // Επιστροφή στο Dashboard
+  
+    } catch (error) {
+      console.error('❌ Σφάλμα επεξεργασίας:', error)
     }
   }
+  
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">📝 Δημιουργία Κουίζ</h1>
-        <button
-          onClick={clearAll}
-          className="text-sm text-red-600 border border-red-500 px-3 py-1 rounded hover:bg-red-50"
-        >
-          Καθαρισμός Όλων
-        </button>
-      </div>
+      <h1 className="text-2xl font-bold">✏️ Επεξεργασία Κουίζ</h1>
 
       <input
         type="text"

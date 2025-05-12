@@ -25,7 +25,16 @@ export default function HostQuizPage() {
   const [showPlayers, setShowPlayers] = useState(true)
   const [completedCount, setCompletedCount] = useState(0)
 
-  document.title = quizTitle
+  const [clientSide, setClientSide] = useState(false)
+
+  useEffect(() => {
+    setClientSide(true) // Απενεργοποιούμε το window μέχρι να είμαστε στον client-side
+  }, [])
+
+  useEffect(() => {
+    document.title = `Host | ${quizTitle}`
+  }, [quizTitle])
+
   useEffect(() => {
     const fetchAll = async () => {
       const { data: quiz } = await supabase
@@ -112,13 +121,21 @@ export default function HostQuizPage() {
     }
   }
 
+  const handleFinish = async () => {
+    await supabase.from('quizzes').update({ status: 'finished' }).eq('id', quizId)
+    setStatus('finished')
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-center mb-6">{quizTitle}</h1>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 mb-6">
         <div className="flex items-center gap-6">
-          <QRCode value={`${window.location.origin}/join?quizId=${quizId}`} size={140} />
+          {/* Εμφανίζουμε το QRCode μόνο αν είμαστε στον client */}
+          {clientSide && (
+            <QRCode value={`${window.location.origin}/join?quizId=${quizId}`} size={140} />
+          )}
           <div className="text-xl font-bold">
             Κωδικός Quiz: <span className="font-mono text-blue-700">{shortId}</span>
           </div>
@@ -178,6 +195,18 @@ export default function HostQuizPage() {
             className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
           >
             ✅ Έναρξη Κουίζ
+          </button>
+        </div>
+      )}
+
+      {/* Το κουμπί τερματισμού προστίθεται εδώ */}
+      {status === 'playing' && (
+        <div className="mt-4">
+          <button
+            onClick={handleFinish}
+            className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
+          >
+            Τερματισμός
           </button>
         </div>
       )}

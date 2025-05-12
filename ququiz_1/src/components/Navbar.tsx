@@ -22,7 +22,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/'
+    window.location.href = '/' // Αφού αποσυνδεθεί, επιστρέφει στην αρχική σελίδα
   }
 
   const linkClass = (path: string) =>
@@ -49,7 +49,30 @@ export default function Navbar() {
           <>
             <Link href="/host" className={linkClass('/host')}>Διαχείριση</Link>
             <Link href="/host/create" className={linkClass('/host/create')}>Δημιουργία</Link>
-            <button onClick={handleLogout} className="hover:underline">Αποσύνδεση</button>
+
+            {/* Dropdown for user */}
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="flex items-center space-x-2 hover:underline"
+              >
+                Προφίλ
+                
+              </button>
+              {/* Dropdown menu */}
+              {menuOpen && (
+                <div className="absolute right-0  bg-blue-200 text-black px-1 py-2 rounded-md shadow-md mt-2">
+                  <p className="w-full text-left px-2 py-1"> {user.email} </p>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-2 py-1 hover:bg-blue-500 rounded"
+                  >
+                    Αποσύνδεση
+                  </button>
+                </div>
+              )}
+            </div>
+            
           </>
         ) : (
           <Link href="/login" className={linkClass('/login')}>Σύνδεση</Link>
@@ -72,6 +95,7 @@ export default function Navbar() {
             <>
               <Link href="/host" className={linkClass('/host')} onClick={() => setMenuOpen(false)}>Διαχείριση</Link>
               <Link href="/host/create" className={linkClass('/host/create')} onClick={() => setMenuOpen(false)}>Δημιουργία</Link>
+              <p> {user.email} </p>
               <button onClick={handleLogout}>Αποσύνδεση</button>
             </>
           ) : (

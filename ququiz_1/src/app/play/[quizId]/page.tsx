@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { useRouter } from 'next/navigation'
 
 type Question = {
   questionText: string
@@ -23,6 +24,7 @@ export default function PlayQuizPage() {
   const { quizId } = useParams()
   const searchParams = useSearchParams()
   const playerCode = searchParams.get('player')
+  const router = useRouter()
 
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [quizStarted, setQuizStarted] = useState(false)
@@ -31,9 +33,6 @@ export default function PlayQuizPage() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showAnswer, setShowAnswer] = useState(false)
   const [timeLeft, setTimeLeft] = useState(0)
-  
-
-
 
   useEffect(() => {
     if (quiz && quizStarted) {
@@ -41,8 +40,6 @@ export default function PlayQuizPage() {
     }
   }, [quiz, quizStarted])
 
-  
-  
   // 📥 Φόρτωση κουίζ
   useEffect(() => {
     const fetchQuiz = async () => {
@@ -150,6 +147,12 @@ export default function PlayQuizPage() {
       }
 
       setQuizFinished(true)
+
+      // Αναμονή 3 δευτερόλεπτα πριν την ανακατεύθυνση
+      setTimeout(() => {
+        router.push('/join')
+      }, 3000)
+
       return
     }
 

@@ -106,7 +106,8 @@ export default function HostDashboard() {
                 onClick={() => {
                   localStorage.setItem('edit_quiz_id', quiz.id)
                   localStorage.setItem('edit_quiz_title', quiz.title)
-                  router.push('/host/create')
+                  
+                  router.push('/host/edit')
                 }}
                 className="px-4 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
               >
