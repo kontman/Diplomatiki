@@ -86,45 +86,54 @@ export default function JoinPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-6 text-center">🎮 Συμμετοχή σε Quiz</h1>
+  <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4">
+    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md w-full max-w-md">
+      <h1 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
+        🎮 Συμμετοχή σε Quiz
+      </h1>
 
-        <form onSubmit={handleJoin} className="space-y-4">
-          <div>
-            <label className="block mb-1 font-medium">Κωδικός Quiz:</label>
-            <input
-              type="text"
-              value={shortId}
-              onChange={(e) => setShortId(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-              required
-              maxLength={4}
-            />
-          </div>
+      <form onSubmit={handleJoin} className="space-y-5">
+        <div>
+          <label className="block mb-1 text-gray-700 dark:text-gray-300 font-medium">
+            Κωδικός Quiz:
+          </label>
+          <input
+            type="text"
+            value={shortId}
+            onChange={(e) => setShortId(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            maxLength={4}
+          />
+        </div>
 
-          <div>
-            <label className="block mb-1 font-medium">Όνομα Παίκτη (7 ψηφία):</label>
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-              required
-              maxLength={7}
-            />
-          </div>
+        <div>
+          <label className="block mb-1 text-gray-700 dark:text-gray-300 font-medium">
+            Όνομα Παίκτη (7 ψηφία):
+          </label>
+          <input
+            type="text"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            maxLength={7}
+          />
+        </div>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && (
+          <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+        )}
 
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
-          >
-            Συμμετοχή
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition"
+        >
+          Συμμετοχή
+        </button>
+      </form>
     </div>
-  )
+  </div>
+)
+
 }

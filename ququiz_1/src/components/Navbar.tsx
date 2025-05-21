@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import ThemeToggle from './ThemeToggle'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -78,6 +79,8 @@ export default function Navbar() {
           <Link href="/login" className={linkClass('/login')}>Σύνδεση</Link>
         )}
       </div>
+
+      <ThemeToggle />
 
       {/* Mobile menu button */}
       <div className="md:hidden">

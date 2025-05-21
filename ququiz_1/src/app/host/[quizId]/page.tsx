@@ -126,6 +126,25 @@ export default function HostQuizPage() {
     setStatus('finished')
   }
 
+
+  const exportToCSV = () => {
+  const headers = ['Player Code', 'Score']
+  const rows = players.map(p => [p.player_code, p.score])
+
+  const csvContent =
+    'data:text/csv;charset=utf-8,' +
+    [headers, ...rows].map(row => row.join(';')).join('\n')
+
+  const encodedUri = encodeURI(csvContent)
+  const link = document.createElement('a')
+  link.setAttribute('href', encodedUri)
+  link.setAttribute('download', 'leaderboard.csv')
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-center mb-6">{quizTitle}</h1>
@@ -214,13 +233,31 @@ export default function HostQuizPage() {
       {showLeaderboard && (
         <>
           <h2 className="text-xl font-bold mt-10 mb-2">📊 Πίνακας Κατάταξης</h2>
-          <ol className="list-decimal pl-5 space-y-1">
-            {players.map(p => (
-              <li key={p.id}>
-                Παίκτης #{p.player_code} – {p.score} πόντοι
-              </li>
-            ))}
-          </ol>
+          <table className="w-full mt-4 border border-gray-300 rounded">
+            <thead>
+              <tr className="bg-blue-100 text-left text-blue-800 font-semibold">
+                <th className="px-4 py-2 border-b">Παίκτης</th>
+                <th className="px-4 py-2 border-b">Πόντοι</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((p) => (
+                <tr key={p.id} className="hover:bg-gray-100 bg-white">
+                  <td className="px-4 py-2 border-b">#{p.player_code}</td>
+                  <td className="px-4 py-2 border-b">{p.score}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+        <button
+          onClick={exportToCSV}
+          className="mt-4 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+        >
+          📥 Εξαγωγή σε CSV
+        </button>
+
+
         </>
       )}
     </div>

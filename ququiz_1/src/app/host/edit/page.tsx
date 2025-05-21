@@ -15,6 +15,12 @@ export default function EditQuizPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const router = useRouter()
 
+
+  useEffect(() => {
+      if (typeof window !== 'undefined') {
+        document.title = 'Edit';
+      }
+    }, []);
  
 
   // Φόρτωση δεδομένων από το localStorage
