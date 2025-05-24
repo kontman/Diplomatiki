@@ -1,26 +1,36 @@
-// Εκδοχή CreateQuizPage που υποστηρίζει εικόνες στις απαντήσεις
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { v4 as uuidv4 } from 'uuid'
 
 interface Option {
   text: string
   imageUrl?: string
-  tempPreviewUrl?: string // για preview πριν ολοκληρωθεί το upload
+  tempPreviewUrl?: string
+}
+
+interface Question {
+  id: string
+  questionText: string
+  options: Option[]
+  correctIndex: number
+  duration: number
+  imageUrl?: string
 }
 
 export default function CreateQuizPage() {
   const [title, setTitle] = useState('')
-  const [questions, setQuestions] = useState<any[]>([])
+  const [questions, setQuestions] = useState<Question[]>([])
   const [currentQuestion, setCurrentQuestion] = useState('')
   const [currentOptions, setCurrentOptions] = useState<Option[]>([{ text: '' }, { text: '' }])
   const [correctIndex, setCorrectIndex] = useState<number | null>(null)
   const [currentDuration, setCurrentDuration] = useState<number>(15)
-  const [userId, setUserId] = useState<string | null>(null)
   const [currentImage, setCurrentImage] = useState<File | null>(null)
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null)
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -63,10 +73,8 @@ export default function CreateQuizPage() {
       updated[index].tempPreviewUrl = preview
       return updated
     })
-
     const url = await uploadImage(file)
     if (!url) return
-
     setCurrentOptions((prev) => {
       const updated = [...prev]
       updated[index].imageUrl = url
@@ -93,22 +101,42 @@ export default function CreateQuizPage() {
       if (!imageUrl) return alert('Αποτυχία ανέβασματος εικόνας ερώτησης.')
     }
 
-    const newQuestions = [...questions, {
+    const newQuestion: Question = {
+      id: editingQuestionId ?? uuidv4(),
       questionText: currentQuestion,
       options: currentOptions.map(({ tempPreviewUrl, ...rest }) => rest),
       correctIndex,
       duration: currentDuration,
-      imageUrl,
-    }]
+      imageUrl: imageUrl ?? undefined,
+    }
 
-    setQuestions(newQuestions)
-    localStorage.setItem('quiz_progress', JSON.stringify(newQuestions))
+    let updatedQuestions: Question[]
+    if (editingQuestionId) {
+      updatedQuestions = questions.map(q => q.id === editingQuestionId ? newQuestion : q)
+    } else {
+      updatedQuestions = [...questions, newQuestion]
+    }
+
+    setQuestions(updatedQuestions)
+    localStorage.setItem('quiz_progress', JSON.stringify(updatedQuestions))
     setCurrentQuestion('')
     setCurrentOptions([{ text: '' }, { text: '' }])
     setCorrectIndex(null)
     setCurrentDuration(15)
     setCurrentImage(null)
     setCurrentImageUrl(null)
+    setEditingQuestionId(null)
+  }
+
+  const editQuestion = (index: number) => {
+    const q = questions[index]
+    setCurrentQuestion(q.questionText)
+    setCurrentOptions([...q.options])
+    setCorrectIndex(q.correctIndex)
+    setCurrentDuration(q.duration || 15)
+    setCurrentImageUrl(q.imageUrl || null)
+    setCurrentImage(null)
+    setEditingQuestionId(q.id)
   }
 
   const removeQuestion = (index: number) => {
@@ -117,15 +145,34 @@ export default function CreateQuizPage() {
     localStorage.setItem('quiz_progress', JSON.stringify(updated))
   }
 
-  const editQuestion = (index: number) => {
-    const q = questions[index]
-    setCurrentQuestion(q.questionText)
-    setCurrentOptions(q.options)
-    setCorrectIndex(q.correctIndex)
-    setCurrentDuration(q.duration || 15)
-    setCurrentImageUrl(q.imageUrl || null)
-    setCurrentImage(null)
-    setQuestions(prev => prev.filter((_, i) => i !== index))
+  const handleSubmit = async () => {
+    if (!title || questions.length === 0 || !userId) {
+      alert('Συμπλήρωσε τίτλο και ερωτήσεις.')
+      return
+    }
+
+    const { data: existingQuiz } = await supabase.from('quizzes').select('title').eq('title', title).single()
+    if (existingQuiz) {
+      alert('Υπάρχει ήδη κουίζ με αυτόν τον τίτλο.')
+      return
+    }
+
+    const shortId = Math.floor(1000 + Math.random() * 9000).toString()
+    const { error } = await supabase.from('quizzes').insert({
+      title,
+      questions,
+      short_id: shortId,
+      status: 'waiting',
+      started: false,
+      host_id: userId,
+    })
+
+    if (!error) {
+      localStorage.removeItem('quiz_progress')
+      router.push('/host')
+    } else {
+      console.error('❌ Σφάλμα δημιουργίας:', error)
+    }
   }
 
   const updateOptionText = (value: string, index: number) => {
@@ -147,38 +194,21 @@ export default function CreateQuizPage() {
     }
   }
 
-  const handleSubmit = async () => {
-    if (!title || questions.length === 0 || !userId)
-      return alert('Συμπλήρωσε τίτλο και ερωτήσεις.')
-
-    const { data: existingQuiz } = await supabase.from('quizzes').select('title').eq('title', title).single()
-    if (existingQuiz) return alert('Υπάρχει ήδη κουίζ με αυτόν τον τίτλο.')
-
-    const shortId = Math.floor(1000 + Math.random() * 9000).toString()
-    const { error } = await supabase.from('quizzes').insert({
-      title,
-      questions,
-      short_id: shortId,
-      status: 'waiting',
-      started: false,
-      host_id: userId,
-    })
-
-    if (!error) {
-      localStorage.removeItem('quiz_progress')
-      router.push('/host')
-    } else console.error('❌ Σφάλμα:', error)
-  }
-
   const clearAll = () => {
-    if (confirm('Θέλεις σίγουρα να διαγράψεις όλες τις ερωτήσεις;')) setQuestions([])
+    if (confirm('Θέλεις σίγουρα να διαγράψεις όλες τις ερωτήσεις;')) {
+      setQuestions([])
+      localStorage.removeItem('quiz_progress')
+    }
   }
 
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">📝 Δημιουργία Κουίζ</h1>
-        <button onClick={clearAll} className="text-sm text-red-600 border border-red-500 px-3 py-1 rounded hover:bg-red-50">
+        <button
+          onClick={clearAll}
+          className="text-sm text-red-600 border border-red-500 px-3 py-1 rounded hover:bg-red-50"
+        >
           Καθαρισμός Όλων
         </button>
       </div>
@@ -218,7 +248,9 @@ export default function CreateQuizPage() {
                 className="w-full border p-2 rounded mb-1"
                 placeholder={`Απάντηση ${index + 1}`}
               />
-              {opt.imageUrl && <img src={opt.imageUrl} alt="Option preview" className="max-h-32 mb-1" />}
+              {(opt.tempPreviewUrl || opt.imageUrl) && (
+                <img src={opt.tempPreviewUrl || opt.imageUrl} alt={`Preview ${index + 1}`} className="max-h-32 mb-1" />
+              )}
               <input
                 type="file"
                 accept="image/*"
@@ -263,28 +295,35 @@ export default function CreateQuizPage() {
           <h2 className="text-lg font-semibold mb-2">📋 Ερωτήσεις</h2>
           <ul className="space-y-3">
             {questions.map((q, index) => (
-              <li key={index} className="p-3 border rounded">
+              <li key={q.id} className="p-3 border rounded">
                 <p className="font-semibold">{index + 1}. {q.questionText}</p>
                 {q.imageUrl && (
-                  <img src={q.imageUrl} alt={`Εικόνα ερώτησης ${index + 1}`} className="max-h-48 mt-2 object-contain" />
+                  <img src={q.imageUrl} alt={`Ερώτηση ${index + 1}`} className="max-h-48 mt-2 object-contain" />
                 )}
                 <p className="text-sm text-gray-500 mb-1">⏱ Χρόνος: {q.duration}s</p>
                 <ul className="pl-5 mt-1 list-disc text-sm">
-                  {q.options.map((opt: Option, i: number) => (
+                  <div className="mt-2 flex gap-3">
+                    <button
+                      onClick={() => editQuestion(index)}
+                      className="text-blue-600 text-sm"
+                    >
+                      ✏️ Επεξεργασία
+                    </button>
+                    <button
+                      onClick={() => removeQuestion(index)}
+                      className="text-red-600 text-sm"
+                    >
+                      🗑️ Διαγραφή
+                    </button>
+                  </div>
+
+                  {q.options.map((opt, i) => (
                     <li key={i} className={i === q.correctIndex ? 'text-green-600 font-semibold' : ''}>
                       {opt.text}
-                      {opt.imageUrl && (
-                        <div>
-                          <img src={opt.imageUrl} alt={`Απάντηση ${i + 1}`} className="max-h-24 mt-1" />
-                        </div>
-                      )}
+                      {opt.imageUrl && <img src={opt.imageUrl} alt={`Απ. ${i + 1}`} className="max-h-24 mt-1" />}
                     </li>
                   ))}
                 </ul>
-                <div className="mt-2 flex gap-3">
-                  <button onClick={() => editQuestion(index)} className="text-blue-600 text-sm">✏️ Επεξεργασία</button>
-                  <button onClick={() => removeQuestion(index)} className="text-red-600 text-sm">🗑️ Διαγραφή</button>
-                </div>
               </li>
             ))}
           </ul>

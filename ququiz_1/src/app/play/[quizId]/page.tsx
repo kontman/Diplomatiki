@@ -1,10 +1,8 @@
-// Προσαρμοσμένη έκδοση με εμφάνιση εικόνας σε κάθε απάντηση (αν υπάρχει)
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation'
 
 interface Option {
   text: string
@@ -12,6 +10,7 @@ interface Option {
 }
 
 interface Question {
+  id: string
   questionText: string
   options: Option[]
   correctIndex: number
@@ -22,53 +21,64 @@ interface Question {
 interface Quiz {
   id: string
   title: string
-  started: boolean
-  status: string
   questions: Question[]
+  current_question_id: string | null
+  status: string
 }
 
 export default function PlayQuizPage() {
   const { quizId } = useParams()
   const searchParams = useSearchParams()
   const playerCode = searchParams.get('player')
-  const router = useRouter()
 
   const [quiz, setQuiz] = useState<Quiz | null>(null)
-  const [quizStarted, setQuizStarted] = useState(false)
-  const [quizFinished, setQuizFinished] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [activeQuestion, setActiveQuestion] = useState<Question | null>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
-  const [showAnswer, setShowAnswer] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [waiting, setWaiting] = useState(false)
   const [timeLeft, setTimeLeft] = useState(0)
+  const router = useRouter()
 
-  useEffect(() => {
-    if (quiz && quizStarted) document.title = `Play | ${quiz.title}`
-  }, [quiz, quizStarted])
+  const fetchQuiz = async () => {
+    const { data } = await supabase
+      .from('quizzes')
+      .select('id, title, questions, current_question_id, status')
+      .eq('id', quizId)
+      .single()
 
-  useEffect(() => {
-    if (!quizId) return
-
-    const fetchQuiz = async () => {
-      const { data } = await supabase.from('quizzes').select('*').eq('id', quizId).single()
-      if (data) {
-        setQuiz(data)
-        setQuizStarted(data.started)
-        setQuizFinished(data.status === 'finished')
-        setTimeLeft(data.questions[0]?.duration || 15)
-      }
+    if (data) {
+      setQuiz(data)
+      const current = data.questions.find((q: Question) => q.id === data.current_question_id)
+      setActiveQuestion(current || null)
+      setSelectedAnswer(null)
+      setSubmitted(false)
+      setWaiting(false)
+      setTimeLeft(current?.duration || 15)
     }
+  }
 
-    fetchQuiz()
+  useEffect(() => {
+    if (quiz?.title && typeof window !== 'undefined') {
+      document.title = `Playing | ${quiz.title}`
+    }
+  }, [quiz?.title])
+
+  useEffect(() => {
+    if (quizId) fetchQuiz()
   }, [quizId])
 
   useEffect(() => {
-    const channel = supabase.channel(`quiz-${quizId}`).on('postgres_changes', {
-      event: 'UPDATE', schema: 'public', table: 'quizzes', filter: `id=eq.${quizId}`
-    }, (payload) => {
-      const updated = payload.new as Quiz
-      setQuizStarted(updated.started)
-      setQuizFinished(updated.status === 'finished')
-    }).subscribe()
+    const channel = supabase
+      .channel(`quiz-${quizId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'quizzes',
+        filter: `id=eq.${quizId}`
+      }, () => {
+        fetchQuiz()
+      })
+      .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
@@ -76,111 +86,114 @@ export default function PlayQuizPage() {
   }, [quizId])
 
   useEffect(() => {
-    if (!quizStarted || showAnswer || quizFinished) return
-    if (timeLeft === 0) return setShowAnswer(true)
-    const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [timeLeft, showAnswer, quizStarted, quizFinished])
+    if (!submitted && timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [timeLeft, submitted])
+
+  useEffect(() => {
+    if (quiz?.status === 'finished') {
+      if (playerCode && quiz.id) {
+        supabase.from('players')
+          .update({ finished: true })
+          .eq('quiz_id', quiz.id)
+          .eq('player_code', playerCode.trim())
+      }
+
+      const timeout = setTimeout(() => {
+        router.push('/join')
+      }, 3000)
+
+      return () => clearTimeout(timeout)
+    }
+  }, [quiz?.status])
 
   const handleAnswer = async (index: number) => {
-    if (showAnswer || !playerCode || !quiz) return
-    const q = quiz.questions[currentIndex]
-    const isCorrect = index === q.correctIndex
-    const rawScore = ((q.duration - (q.duration - timeLeft)) / q.duration) * 100
-    const earned = isCorrect ? Math.floor(rawScore) : 0
+    if (!quiz || !playerCode || !quiz.current_question_id) return
+
+    const fullQuestion = quiz.questions.find(q => q.id === quiz.current_question_id)
+    if (!fullQuestion) {
+      console.warn('❌ Δεν βρέθηκε η ερώτηση με το id:', quiz.current_question_id)
+      return
+    }
+
+    const correct = index === fullQuestion.correctIndex
+    const duration = fullQuestion.duration || 15
+    const timeUsed = duration - timeLeft
+    const rawScore = ((duration - timeUsed) / duration) * 100
+    const earned = correct ? Math.floor(rawScore) : 0
+
     setSelectedAnswer(index)
-    setShowAnswer(true)
+    setSubmitted(true)
+    setWaiting(true)
+
+    
+
+    /*console.log('🎯 PLAYER INSERT:', {
+        quiz_id: quiz.id,
+        question_id: fullQuestion.id,
+        player_code: playerCode.trim(),
+        selected_index: index
+      })*/
+
+    await supabase.from('player_answers').insert({
+      quiz_id: quiz.id,
+      question_id: fullQuestion.id,
+      player_code: playerCode.trim(),
+      selected_index: index
+    })
 
     if (earned > 0) {
-      const { data } = await supabase.from('players').select('score').eq('quiz_id', quizId).eq('player_code', playerCode).single()
-      const current = data?.score || 0
-      await supabase.from('players').update({ score: current + earned }).eq('quiz_id', quizId).eq('player_code', playerCode)
+      await supabase.rpc('award_score', {
+        quiz_id_input: quiz.id,
+        player_code_input: playerCode,
+        score_input: earned
+      })
     }
-  }
-
-  const nextQuestion = async () => {
-    if (!quiz || !playerCode || !quizId) return
-    const next = currentIndex + 1
-    if (next >= quiz.questions.length) {
-      await supabase.from('players').update({ finished: true }).eq('quiz_id', quizId).eq('player_code', playerCode)
-      const { data: all } = await supabase.from('players').select('finished').eq('quiz_id', quizId)
-      if (all?.every(p => p.finished)) await supabase.from('quizzes').update({ status: 'finished' }).eq('id', quizId)
-      setQuizFinished(true)
-      return setTimeout(() => router.push('/join'), 3000)
-    }
-    setCurrentIndex(next)
-    setSelectedAnswer(null)
-    setShowAnswer(false)
-    setTimeLeft(quiz.questions[next].duration || 15)
   }
 
   if (!quiz || !playerCode) return <p className="p-6">Φόρτωση...</p>
-
-  if (!quizStarted) return <div className="p-6 text-center"><p className="text-xl font-semibold">Αναμονή για έναρξη από τον host...</p></div>
-
-  if (quizFinished) return <div className="p-6 text-center"><h1 className="text-2xl font-bold mb-4">{quiz.title}</h1><p className="text-lg text-green-700 font-semibold">Το κουίζ έχει ολοκληρωθεί 🎉</p></div>
-
-  const question = quiz.questions[currentIndex]
-  const isCorrect = selectedAnswer === question.correctIndex
+  if (!quiz.current_question_id) {
+    return quiz.status === 'finished' ? (
+      <div className="p-6 text-center text-green-700 font-semibold">
+        Το κουίζ ολοκληρώθηκε 🎉
+      </div>
+    ) : (
+      <p className="text-center p-6">Αναμονή για την επόμενη ερώτηση...</p>
+    )
+  }
+  if (!activeQuestion) return <p className="p-6">Αναμονή για έναρξη από τον host...</p>
 
   return (
     <div className="max-w-2xl mx-auto p-6">
       <h1 className="text-xl font-bold mb-4">{quiz.title}</h1>
-      <div className="mb-4">
-        <p className="text-lg font-medium">Ερώτηση {currentIndex + 1} / {quiz.questions.length}</p>
-        {question.imageUrl && (
-          <img src={question.imageUrl} alt="Εικόνα ερώτησης" className="max-h-64 my-4 mx-auto object-contain rounded" />
-        )}
-        <p className="text-gray-700">{question.questionText}</p>
-        <p className="text-sm text-gray-500">Χρόνος: {timeLeft}s</p>
-      </div>
+      <p className="text-lg font-medium mb-1">{activeQuestion.questionText}</p>
+      {activeQuestion.imageUrl && (
+        <img src={activeQuestion.imageUrl} className="max-h-64 object-contain mb-3" alt="Ερώτηση" />
+      )}
 
-      <div className="space-y-4">
-        {question.options.map((option, i) => {
-          const isSelected = selectedAnswer === i
-          const isCorrectAnswer = i === question.correctIndex
+      <p className="text-sm text-gray-500 mb-3">Χρόνος: {timeLeft}s</p>
 
-          return (
-            <button
-              key={i}
-              disabled={showAnswer}
-              onClick={() => handleAnswer(i)}
-              className={`w-full text-left px-4 py-2 border rounded flex flex-col items-start gap-2 ${
-                showAnswer
-                  ? isCorrectAnswer
-                    ? 'bg-green-200 border-green-600'
-                    : isSelected
-                    ? 'bg-red-200 border-red-600'
-                    : 'opacity-50'
-                  : 'hover:bg-gray-100'
-              }`}
-            >
-              <span>{option.text}</span>
-              {option.imageUrl && (
-                <img
-                  src={option.imageUrl}
-                  alt={`Απάντηση ${i + 1}`}
-                  className="max-h-32 object-contain"
-                />
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {showAnswer && (
-        <div className="mt-4">
-          {isCorrect ? (
-            <p className="text-green-600 font-semibold">Σωστό!</p>
-          ) : (
-            <p className="text-red-600 font-semibold">Λάθος απάντηση.</p>
-          )}
+      <div className="space-y-2">
+        {activeQuestion.options.map((opt, i) => (
           <button
-            onClick={nextQuestion}
-            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded"
+            key={i}
+            disabled={submitted}
+            onClick={() => handleAnswer(i)}
+            className={`w-full text-left px-4 py-2 border rounded flex flex-col items-start gap-2 ${
+              submitted && i === selectedAnswer ? 'bg-blue-100 border-blue-400' : 'hover:bg-gray-100'
+            }`}
           >
-            {currentIndex + 1 < quiz.questions.length ? 'Επόμενη Ερώτηση' : 'Ολοκλήρωση Κουίζ'}
+            <span>{opt.text}</span>
+            {opt.imageUrl && <img src={opt.imageUrl} className="max-h-32 object-contain" alt="" />}
           </button>
+        ))}
+      </div>
+
+      {waiting && (
+        <div className="mt-6 text-center text-blue-600 font-semibold">
+          ✅ Απάντηση καταχωρίστηκε - Αναμονή για επόμενη ερώτηση...
         </div>
       )}
     </div>

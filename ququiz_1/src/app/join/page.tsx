@@ -41,7 +41,7 @@ export default function JoinPage() {
     if (shortId.length === 4) {
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
-        .select('id')
+        .select('id, status')
         .eq('short_id', shortId)
         .single()
 
@@ -49,6 +49,11 @@ export default function JoinPage() {
         setError('Δεν βρέθηκε Quiz με αυτόν τον κωδικό.')
         return
       }
+
+      if (quiz.status !== 'waiting') {
+    setError('Δεν μπορείς να συμμετάσχεις. Το κουίζ έχει ήδη ξεκινήσει ή ολοκληρωθεί.')
+    return
+  }
 
       quizId = quiz.id
     }

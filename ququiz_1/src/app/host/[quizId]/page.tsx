@@ -89,7 +89,11 @@ export default function HostQuizPage() {
   }, [quizId])
 
   const handleStart = async () => {
-    await supabase.from('quizzes').update({ started: true, status: 'playing' }).eq('id', quizId)
+    await supabase.from('quizzes')
+    .update({ started: true, status: 'playing' })
+    .eq('id', quizId)
+
+    router.push(`/host/${quizId}/manage`)
   }
 
   const handleRestart = async () => {
@@ -98,6 +102,7 @@ export default function HostQuizPage() {
       if (!confirm) return
     }
 
+    await supabase.from('player_answers').delete().eq('quiz_id', quizId)
     await supabase.from('players').delete().eq('quiz_id', quizId)
     await supabase.from('quizzes').update({ started: false, status: 'waiting' }).eq('id', quizId)
 
