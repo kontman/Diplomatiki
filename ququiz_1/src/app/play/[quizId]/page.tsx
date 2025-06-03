@@ -24,6 +24,7 @@ interface Quiz {
   questions: Question[]
   current_question_id: string | null
   status: string
+  started: boolean
 }
 
 export default function PlayQuizPage() {
@@ -42,7 +43,7 @@ export default function PlayQuizPage() {
   const fetchQuiz = async () => {
     const { data } = await supabase
       .from('quizzes')
-      .select('id, title, questions, current_question_id, status')
+      .select('id, title, questions, current_question_id, status, started')
       .eq('id', quizId)
       .single()
 
@@ -153,17 +154,21 @@ export default function PlayQuizPage() {
     }
   }
 
+  
+
   if (!quiz || !playerCode) return <p className="p-6">Φόρτωση...</p>
   if (!quiz.current_question_id) {
-    return quiz.status === 'finished' ? (
-      <div className="p-6 text-center text-green-700 font-semibold">
-        Το κουίζ ολοκληρώθηκε 🎉
-      </div>
-    ) : (
-      <p className="text-center p-6">Αναμονή για την επόμενη ερώτηση...</p>
-    )
+    if (!quiz.started) {
+      return <p className="p-6 text-center">Αναμονή για έναρξη από τον host...</p>
+    }
+    return <p className="p-6 text-center">Αναμονή για την επόμενη ερώτηση...</p>
   }
-  if (!activeQuestion) return <p className="p-6">Αναμονή για έναρξη από τον host...</p>
+  if (!activeQuestion) {
+    return <p className="p-6 text-center">Αναμονή για έναρξη από τον host...</p>
+  }
+
+
+
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -193,7 +198,7 @@ export default function PlayQuizPage() {
 
       {waiting && (
         <div className="mt-6 text-center text-blue-600 font-semibold">
-          ✅ Απάντηση καταχωρίστηκε - Αναμονή για επόμενη ερώτηση...
+          ✅ Απάντηση καταχωρήθηκε - Αναμονή για επόμενη ερώτηση...
         </div>
       )}
     </div>

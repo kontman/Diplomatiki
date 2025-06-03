@@ -18,6 +18,7 @@ interface Question {
   correctIndex: number
   duration: number
   imageUrl?: string
+  isSurvey?: boolean
 }
 
 export default function CreateQuizPage() {
@@ -31,10 +32,11 @@ export default function CreateQuizPage() {
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null)
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isSurvey, setIsSurvey] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    document.title = 'Create'
+    document.title = 'Create | Ququiz'
   }, [])
 
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function CreateQuizPage() {
   }
 
   const addQuestion = async () => {
-    if (!currentQuestion || correctIndex === null || !currentDuration) {
+    if (!currentQuestion || !currentDuration || (!isSurvey && correctIndex === null)) {
       alert('Συμπλήρωσε όλα τα πεδία της ερώτησης.')
       return
     }
@@ -105,9 +107,10 @@ export default function CreateQuizPage() {
       id: editingQuestionId ?? uuidv4(),
       questionText: currentQuestion,
       options: currentOptions.map(({ tempPreviewUrl, ...rest }) => rest),
-      correctIndex,
+      correctIndex: isSurvey ? -1 : (correctIndex ?? -1),
       duration: currentDuration,
       imageUrl: imageUrl ?? undefined,
+      isSurvey
     }
 
     let updatedQuestions: Question[]
@@ -126,17 +129,19 @@ export default function CreateQuizPage() {
     setCurrentImage(null)
     setCurrentImageUrl(null)
     setEditingQuestionId(null)
+    setIsSurvey(false)
   }
 
   const editQuestion = (index: number) => {
     const q = questions[index]
     setCurrentQuestion(q.questionText)
     setCurrentOptions([...q.options])
-    setCorrectIndex(q.correctIndex)
+    setCorrectIndex(q.correctIndex >= 0 ? q.correctIndex : null)
     setCurrentDuration(q.duration || 15)
     setCurrentImageUrl(q.imageUrl || null)
     setCurrentImage(null)
     setEditingQuestionId(q.id)
+    setIsSurvey(q.isSurvey || false)
   }
 
   const removeQuestion = (index: number) => {
@@ -205,6 +210,7 @@ export default function CreateQuizPage() {
     <div className="max-w-3xl mx-auto p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">📝 Δημιουργία Κουίζ</h1>
+        
         <button
           onClick={clearAll}
           className="text-sm text-red-600 border border-red-500 px-3 py-1 rounded hover:bg-red-50"
@@ -212,6 +218,16 @@ export default function CreateQuizPage() {
           Καθαρισμός Όλων
         </button>
       </div>
+
+      <label className="block text-sm font-medium mb-2">
+          <input
+            type="checkbox"
+            checked={isSurvey}
+            onChange={(e) => setIsSurvey(e.target.checked)}
+            className="mr-2"
+          />
+          Χωρίς σωστή απάντηση / χωρίς βαθμολογία (ερωτηματολόγιο)
+        </label>
 
       <input
         type="text"
@@ -238,6 +254,8 @@ export default function CreateQuizPage() {
           {currentImageUrl && <img src={currentImageUrl} alt="Preview" className="mt-2 max-h-40 object-contain" />}
         </div>
 
+        
+
         {currentOptions.map((opt, index) => (
           <div key={index} className="flex items-start gap-2 mb-2">
             <div className="flex-grow">
@@ -258,7 +276,9 @@ export default function CreateQuizPage() {
               />
             </div>
             <div className="flex flex-col items-center">
-              <input type="radio" name="correct" checked={correctIndex === index} onChange={() => setCorrectIndex(index)} />
+              {!isSurvey && (
+                <input type="radio" name="correct" checked={correctIndex === index} onChange={() => setCorrectIndex(index)} />
+              )}
               {currentOptions.length > 2 && (
                 <button onClick={() => removeOption(index)} className="text-red-500 text-xs mt-1">✖</button>
               )}
@@ -302,28 +322,27 @@ export default function CreateQuizPage() {
                 )}
                 <p className="text-sm text-gray-500 mb-1">⏱ Χρόνος: {q.duration}s</p>
                 <ul className="pl-5 mt-1 list-disc text-sm">
-                  <div className="mt-2 flex gap-3">
-                    <button
-                      onClick={() => editQuestion(index)}
-                      className="text-blue-600 text-sm"
-                    >
-                      ✏️ Επεξεργασία
-                    </button>
-                    <button
-                      onClick={() => removeQuestion(index)}
-                      className="text-red-600 text-sm"
-                    >
-                      🗑️ Διαγραφή
-                    </button>
-                  </div>
-
                   {q.options.map((opt, i) => (
-                    <li key={i} className={i === q.correctIndex ? 'text-green-600 font-semibold' : ''}>
+                    <li key={i} className={i === q.correctIndex && !q.isSurvey ? 'text-green-600 font-semibold' : ''}>
                       {opt.text}
                       {opt.imageUrl && <img src={opt.imageUrl} alt={`Απ. ${i + 1}`} className="max-h-24 mt-1" />}
                     </li>
                   ))}
                 </ul>
+                <div className="mt-2 flex gap-3">
+                  <button
+                    onClick={() => editQuestion(index)}
+                    className="text-blue-600 text-sm"
+                  >
+                    ✏️ Επεξεργασία
+                  </button>
+                  <button
+                    onClick={() => removeQuestion(index)}
+                    className="text-red-600 text-sm"
+                  >
+                    🗑️ Διαγραφή
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

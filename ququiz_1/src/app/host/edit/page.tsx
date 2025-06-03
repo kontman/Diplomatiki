@@ -15,7 +15,7 @@ interface Question {
   id: string
   questionText: string
   options: Option[]
-  correctIndex: number
+  correctIndex: number | null
   duration: number
   imageUrl?: string
 }
@@ -33,6 +33,7 @@ export default function EditQuizPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [quizId, setQuizId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [isSurvey, setIsSurvey] = useState<boolean>(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -101,8 +102,13 @@ export default function EditQuizPage() {
   }
 
   const addQuestion = async () => {
-    if (!currentQuestion || correctIndex === null || !currentDuration) {
+    if (!currentQuestion || !currentDuration) {
       alert('Συμπλήρωσε όλα τα πεδία της ερώτησης.')
+      return
+    }
+
+    if (!isSurvey && correctIndex === null) {
+      alert('Επίλεξε σωστή απάντηση ή ενεργοποίησε την επιλογή "Χωρίς βαθμολογία".')
       return
     }
 
@@ -122,7 +128,7 @@ export default function EditQuizPage() {
       id: editingQuestionId ?? uuidv4(),
       questionText: currentQuestion,
       options: currentOptions.map(({ tempPreviewUrl, ...rest }) => rest),
-      correctIndex,
+      correctIndex: isSurvey ? null : correctIndex,
       duration: currentDuration,
       imageUrl: imageUrl ?? undefined,
     }
@@ -210,6 +216,18 @@ export default function EditQuizPage() {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">✏️ Επεξεργασία Κουίζ</h1>
+      
+      <div className="mb-4">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isSurvey}
+            onChange={e => setIsSurvey(e.target.checked)}
+          />
+          Χωρίς βαθμολογία / σωστές απαντήσεις (ερωτηματολόγιο)
+        </label>
+      </div>
+      
       <input
         type="text"
         value={title}
@@ -217,6 +235,8 @@ export default function EditQuizPage() {
         placeholder="Τίτλος κουίζ"
         className="w-full border p-2 mb-4 rounded"
       />
+
+      
 
       <div className="border p-4 rounded mb-6">
         <h2 className="text-lg font-semibold mb-2">Προσθήκη / Επεξεργασία Ερώτησης</h2>
@@ -245,7 +265,9 @@ export default function EditQuizPage() {
               <img src={opt.tempPreviewUrl || opt.imageUrl} alt="" className="max-h-24" />
             )}
             <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && handleOptionImage(e.target.files[0], i)} />
-            <input type="radio" name="correct" checked={correctIndex === i} onChange={() => setCorrectIndex(i)} />
+            {!isSurvey && (
+              <input type="radio" name="correct" checked={correctIndex === i} onChange={() => setCorrectIndex(i)} />
+            )}
             {currentOptions.length > 2 && <button onClick={() => removeOption(i)}>❌</button>}
           </div>
         ))}
