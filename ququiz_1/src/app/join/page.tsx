@@ -13,7 +13,7 @@ export default function JoinPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    document.title = 'Join'
+    document.title = 'Join | Ququiz'
     const quizIdFromLink = searchParams.get('quizId')
     if (quizIdFromLink) {
       setShortId(quizIdFromLink)
@@ -91,8 +91,8 @@ export default function JoinPage() {
   }
 
   return (
-  <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4">
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md w-full max-w-md">
+  <div className="min-h-screen flex items-center justify-center bg-purple-100 dark:bg-purple-900 px-4">
+    <div className="bg-purple-100 dark:bg-purple-900 p-10 rounded-xl  w-full max-w-md">
       <h1 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
         🎮 Συμμετοχή σε Quiz
       </h1>

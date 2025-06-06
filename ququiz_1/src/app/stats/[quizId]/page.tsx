@@ -22,10 +22,10 @@ interface AnswerStats {
 }
 
 interface Review {
-  id: number
+  id: string
   player_code: string
-  quiz_id: string
-  content: string
+  quiz_code: string
+  comment: string
   created_at: string
 }
 
@@ -36,18 +36,28 @@ export default function QuizStatsPage() {
   const [answerStats, setAnswerStats] = useState<Record<string, AnswerStats>>({})
   const [viewMode, setViewMode] = useState<'detailed' | 'summary' | 'reviews'>('detailed')
   const [reviews, setReviews] = useState<Review[]>([])
+  const [quizCode, setQuizCode] = useState<string>('')
+
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: quiz } = await supabase
-        .from('quizzes')
-        .select('questions')
-        .eq('id', quizId)
-        .single()
+      document.title =` Stats | ${viewMode} `
+    }, [viewMode])
 
-      if (!quiz) return
-      setQuestions(quiz.questions)
 
+  useEffect(() => {
+    const fetchQuiz = async () => {
+      const { data } = await supabase.from('quizzes').select('questions, short_id').eq('id', quizId).single()
+      if (data) {
+        setQuestions(data.questions)
+        setQuizCode(data.short_id)
+        //console.log('📦 Fetched quiz with code:', data.short_id)
+      }
+    }
+    if (quizId) fetchQuiz()
+  }, [quizId])
+
+  useEffect(() => {
+    const fetchAnswers = async () => {
       const { data: answers } = await supabase
         .from('player_answers')
         .select('question_id, selected_index')
@@ -60,25 +70,29 @@ export default function QuizStatsPage() {
       })
       setAnswerStats(stats)
     }
-
-    if (quizId) fetchData()
+    if (quizId) fetchAnswers()
   }, [quizId])
 
   useEffect(() => {
-    if (viewMode === 'reviews' && quizId) {
+    if (viewMode === 'reviews' && quizCode) {
       const fetchReviews = async () => {
-        const { data } = await supabase
+        //console.log('🔍 Fetching reviews for quiz_code:', quizCode)
+        const { data, error } = await supabase
           .from('reviews')
           .select('*')
-          .eq('quiz_id', quizId)
+          .eq('quiz_code', quizCode)
           .order('created_at', { ascending: false })
 
-        setReviews(data || [])
+        if (error) {
+          console.error('❌ Error fetching reviews:', error)
+        } else {
+          console.log('✅ Reviews loaded:', data)
+          setReviews(data || [])
+        }
       }
-
       fetchReviews()
     }
-  }, [viewMode, quizId])
+  }, [viewMode, quizCode])
 
   return (
     <div className="max-w-3xl mx-auto p-6">
@@ -131,10 +145,10 @@ export default function QuizStatsPage() {
             <p className="text-gray-600">Δεν υπάρχουν σχόλια για αυτό το quiz.</p>
           ) : (
             <div className="space-y-4">
-              {reviews.map((rev) => (
-                <div key={rev.id} className="border p-4 rounded bg-gray-50">
+              {reviews.map((rev, index) => (
+                <div key={rev.id || index} className="border p-4 rounded bg-gray-50">
                   <p className="text-sm text-gray-700 font-semibold mb-1">Παίκτης: {rev.player_code}</p>
-                  <p className="text-gray-800 whitespace-pre-line">{rev.content}</p>
+                  <p className="text-gray-800 whitespace-pre-line">{rev.comment}</p>
                 </div>
               ))}
             </div>

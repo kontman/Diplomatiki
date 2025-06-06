@@ -21,6 +21,7 @@ interface Question {
 interface Quiz {
   id: string
   title: string
+  short_id: string
   questions: Question[]
   current_question_id: string | null
   status: string
@@ -38,12 +39,22 @@ export default function PlayQuizPage() {
   const [submitted, setSubmitted] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const [timeLeft, setTimeLeft] = useState(0)
+  const [correctCount, setCorrectCount] = useState<number | null>(null)
+  const [totalCount, setTotalCount] = useState<number | null>(null)
+
+
   const router = useRouter()
+
+  useEffect(() => {
+    if (quiz?.title && typeof window !== 'undefined') {
+      document.title = `Playing | ${quiz.title}`
+    }
+  }, [quiz?.title])
 
   const fetchQuiz = async () => {
     const { data } = await supabase
       .from('quizzes')
-      .select('id, title, questions, current_question_id, status, started')
+      .select('id, title,short_id, questions, current_question_id, status, started')
       .eq('id', quizId)
       .single()
 
@@ -56,13 +67,7 @@ export default function PlayQuizPage() {
       setWaiting(false)
       setTimeLeft(current?.duration || 15)
     }
-  }
-
-  useEffect(() => {
-    if (quiz?.title && typeof window !== 'undefined') {
-      document.title = `Playing | ${quiz.title}`
-    }
-  }, [quiz?.title])
+  } 
 
   useEffect(() => {
     if (quizId) fetchQuiz()
@@ -94,21 +99,72 @@ export default function PlayQuizPage() {
   }, [timeLeft, submitted])
 
   useEffect(() => {
+  const checkCompletion = async () => {
+  if (!quiz || !playerCode) return
+
+  interface PlayerAnswer {
+    question_id: string
+    selected_index: number
+  }
+
+  const { data: answersRaw } = await supabase
+    .from('player_answers')
+    .select('question_id, selected_index')
+    .eq('quiz_id', quiz.id)
+    .eq('player_code', playerCode)
+
+  const answers = answersRaw as PlayerAnswer[] || []
+  const answeredCount = answers.length
+  const totalCount = quiz.questions.length
+
+  if (answeredCount === totalCount) {
+    let correct = 0
+
+    for (const q of quiz.questions) {
+      const a = answers.find(ans => ans.question_id === q.id)
+      if (a && a.selected_index === q.correctIndex) correct++
+    }
+
+    setCorrectCount(correct)
+    setTotalCount(totalCount)
+
+    setTimeout(() => {
+      router.push(`/reviews?player=${playerCode}&quiz=${quiz.short_id}`)
+    }, 6000)
+  }
+}
+    
+
+   const checkAndUpdatePlayer = async () => {
     if (quiz?.status === 'finished') {
       if (playerCode && quiz.id) {
-        supabase.from('players')
-          .update({ finished: true })
+        const { data: playerRow, error } = await supabase
+          .from('players')
+          .select('*')
           .eq('quiz_id', quiz.id)
           .eq('player_code', playerCode.trim())
+          .maybeSingle()
+
+        //console.log('Βρέθηκε εγγραφή:', playerRow, error)
+
+        if (playerRow && !playerRow.finished) {
+          await supabase
+            .from('players')
+            .update({ finished: true })
+            .eq('quiz_id', quiz.id)
+            .eq('player_code', playerCode.trim())
+
+        //  console.log('✅ Ενημερώθηκε ως finished:', quiz.id, playerCode.trim())
+        }
       }
-
-      const timeout = setTimeout(() => {
-        router.push('/join')
-      }, 3000)
-
-      return () => clearTimeout(timeout)
     }
-  }, [quiz?.status])
+
+    checkCompletion()
+  }
+
+  checkAndUpdatePlayer()
+}, [quiz?.status])
+
 
   const handleAnswer = async (index: number) => {
     if (!quiz || !playerCode || !quiz.current_question_id) return
@@ -129,15 +185,6 @@ export default function PlayQuizPage() {
     setSubmitted(true)
     setWaiting(true)
 
-    
-
-    /*console.log('🎯 PLAYER INSERT:', {
-        quiz_id: quiz.id,
-        question_id: fullQuestion.id,
-        player_code: playerCode.trim(),
-        selected_index: index
-      })*/
-
     await supabase.from('player_answers').insert({
       quiz_id: quiz.id,
       question_id: fullQuestion.id,
@@ -154,40 +201,82 @@ export default function PlayQuizPage() {
     }
   }
 
-  
+  const [score, setScore] = useState<number | null>(null)
+
+useEffect(() => {
+  const fetchPlayerScore = async () => {
+    if (!quiz || !playerCode) return
+    const { data, error } = await supabase
+      .from('players')
+      .select('score')
+      .eq('quiz_id', quiz.id)
+      .eq('player_code', playerCode.trim())
+      .single()
+
+    if (data?.score !== undefined) {
+      setScore(data.score)
+    }
+  }
+
+  if (quiz?.status === 'finished') {
+    fetchPlayerScore()
+  }
+}, [quiz?.status])
+
 
   if (!quiz || !playerCode) return <p className="p-6">Φόρτωση...</p>
   if (!quiz.current_question_id) {
-    if (!quiz.started) {
-      return <p className="p-6 text-center">Αναμονή για έναρξη από τον host...</p>
-    }
-    return <p className="p-6 text-center">Αναμονή για την επόμενη ερώτηση...</p>
-  }
-  if (!activeQuestion) {
-    return <p className="p-6 text-center">Αναμονή για έναρξη από τον host...</p>
-  }
+    if (!quiz.current_question_id) {
+      if (quiz.status === 'finished' && correctCount !== null) {
+        return (
+          <div>
+          <p className="p-6 text-center text-green-700 font-semibold">
+                         🏁 Ολοκλήρωσες το κουίζ! </p>
+            <p className="p-6 text-center text-green-700 font-semibold"> 
+            Απάντησες σωστά σε {correctCount}/{totalCount} ερωτήσεις!
+          </p>
+          <p className="p-6 text-center text-green-700 font-semibold"> 
+            Συγχαρητήρια συγκέντρωσες {score ?? '...'} πόντους!
+          </p>
+          </div>
+        )
+      }
 
+      if (!quiz.started) {
+        return <div className="min-h-screen bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center">
+            <p className="text-center text-lg font-medium text-gray-900 dark:text-white">
+                Αναμονή για έναρξη από τον host...
+             </p>
+              </div>
+        
+      }
 
-
+      return <div className="min-h-screen bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center">
+            <p className="text-center text-lg font-medium text-gray-900 dark:text-white">
+                Αναμονή για την επόμενη ερώτηση...
+             </p>
+              </div>
+    }}
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="min-h-screen  max-w-2xl mx-auto bg-emerald-100 dark:bg-emerald-900 text-gray-900 dark:text-white p-6">
       <h1 className="text-xl font-bold mb-4">{quiz.title}</h1>
-      <p className="text-lg font-medium mb-1">{activeQuestion.questionText}</p>
-      {activeQuestion.imageUrl && (
-        <img src={activeQuestion.imageUrl} className="max-h-64 object-contain mb-3" alt="Ερώτηση" />
+      <p className="text-lg font-medium mb-1">{activeQuestion!.questionText}</p>
+      {activeQuestion!.imageUrl && (
+        <img src={activeQuestion!.imageUrl} className="max-h-64 object-contain mb-3" alt="Ερώτηση" />
       )}
 
       <p className="text-sm text-gray-500 mb-3">Χρόνος: {timeLeft}s</p>
 
       <div className="space-y-2">
-        {activeQuestion.options.map((opt, i) => (
+        {activeQuestion!.options.map((opt, i) => (
           <button
             key={i}
             disabled={submitted}
             onClick={() => handleAnswer(i)}
             className={`w-full text-left px-4 py-2 border rounded flex flex-col items-start gap-2 ${
-              submitted && i === selectedAnswer ? 'bg-blue-100 border-blue-400' : 'hover:bg-gray-100'
+              submitted && i === selectedAnswer ? 'bg-blue-100 border-blue-400: dark:bg-blue-900 dark:border-blue-500'
+        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
             <span>{opt.text}</span>
@@ -199,6 +288,12 @@ export default function PlayQuizPage() {
       {waiting && (
         <div className="mt-6 text-center text-blue-600 font-semibold">
           ✅ Απάντηση καταχωρήθηκε - Αναμονή για επόμενη ερώτηση...
+        </div>
+      )}
+
+      {correctCount !== null && (
+        <div className="mt-6 text-center text-green-700 font-semibold">
+          🏁 Ολοκλήρωσες το κουίζ! Σωστές απαντήσεις: {correctCount}
         </div>
       )}
     </div>

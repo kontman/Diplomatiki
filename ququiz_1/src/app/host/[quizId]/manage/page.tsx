@@ -37,6 +37,17 @@ export default function HostManagePage() {
   const [stats, setStats] = useState<number[]>([])
   const [playerCount, setPlayerCount] = useState<number>(0)
 
+
+
+  useEffect(() => {
+  if (quiz?.title) {
+    document.title = `Manage | ${quiz.title}`
+  }
+}, [quiz?.title])
+
+
+
+
   useEffect(() => {
     if (!quizId) return
     const fetchQuiz = async () => {
@@ -49,7 +60,36 @@ export default function HostManagePage() {
       }
     }
     fetchQuiz()
-  }, [quizId])
+    const channel = supabase
+    .channel(`quiz-${quizId}`)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'quizzes',
+      filter: `id=eq.${quizId}`,
+    }, (payload) => {
+      const updatedQuiz = payload.new as Quiz
+      setQuiz((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updatedQuiz,
+              id: updatedQuiz.id ?? prev.id,
+              title: updatedQuiz.title ?? prev.title,
+              questions: updatedQuiz.questions ?? prev.questions,
+              current_question_id: updatedQuiz.current_question_id ?? prev.current_question_id,
+              started: updatedQuiz.started ?? prev.started,
+              status: updatedQuiz.status ?? prev.status,
+            }
+          : updatedQuiz
+      )
+    })
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [quizId])
 
   useEffect(() => {
     if (!showAnswers && timeLeft > 0) {
@@ -127,7 +167,7 @@ export default function HostManagePage() {
         <h1 className="text-xl font-bold">🕒 Διαχείριση Quiz | {quiz.title}</h1>
         <button
           onClick={() => router.push(`/host/${quiz.id}`)}
-          className="text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300"
+          className="text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300 dark:text-white dark:bg-gray-900 dark:hover:bg-gray-600"
         >
           🔙 Επιστροφή
         </button>
@@ -185,15 +225,23 @@ export default function HostManagePage() {
         </div>
       ) : (
         <div className="text-center py-6">
-          <p className="mb-4">Καμία ερώτηση σε προβολή.</p>
-          <button
-            onClick={nextQuestion}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          >
-            ▶️ Ξεκίνα το Quiz
-          </button>
-        </div>
-      )}
+    {quiz.status === 'playing' ? (
+      <>
+        <p className="mb-4">Καμία ερώτηση σε προβολή.</p>
+        <button
+          onClick={nextQuestion}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          ▶️ Ξεκίνα το Quiz
+        </button>
+      </>
+    ) : (
+      <p className="text-lg text-green-600 font-semibold">
+        ✅ Το κουίζ ολοκληρώθηκε! Επιστρέψτε πίσω για να δείτε τη βαθμολογία των παικτών.
+      </p>
+    )}
+  </div>
+)}
     </div>
   )
 }

@@ -18,6 +18,10 @@ export default function StatsPage() {
   const router = useRouter()
 
   useEffect(() => {
+      document.title = 'Stats | Ququiz'
+    }, [])
+    
+  useEffect(() => {
     const fetchStats = async () => {
       const { data: quizData } = await supabase
         .from('quizzes')

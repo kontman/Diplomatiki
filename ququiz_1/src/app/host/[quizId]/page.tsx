@@ -204,7 +204,7 @@ export default function HostQuizPage() {
         {showPlayers && (
           <ul className="list-disc list-inside bg-gray-50 p-4 rounded border mt-2">
             {players.map((p) => (
-              <li key={p.id}>
+              <li key={p.id} className=" dark:text-black">
                 Παίκτης #{p.player_code} {p.finished && '✅'}
               </li>
             ))}

@@ -200,17 +200,25 @@ export default function CreateQuizPage() {
   }
 
   const clearAll = () => {
-    if (confirm('Θέλεις σίγουρα να διαγράψεις όλες τις ερωτήσεις;')) {
-      setQuestions([])
-      localStorage.removeItem('quiz_progress')
-    }
+  if (confirm('Θέλεις σίγουρα να διαγράψεις όλες τις ερωτήσεις;')) {
+    setQuestions([])
+    setTitle('')
+    setCurrentQuestion('')
+    setCurrentOptions([{ text: '' }, { text: '' }])
+    setCorrectIndex(null)
+    setCurrentDuration(15)
+    setCurrentImage(null)
+    setCurrentImageUrl(null)
+    setEditingQuestionId(null)
+    setIsSurvey(false)
+    localStorage.removeItem('quiz_progress')
   }
+}
 
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">📝 Δημιουργία Κουίζ</h1>
-        
         <button
           onClick={clearAll}
           className="text-sm text-red-600 border border-red-500 px-3 py-1 rounded hover:bg-red-50"
@@ -220,28 +228,30 @@ export default function CreateQuizPage() {
       </div>
 
       <label className="block text-sm font-medium mb-2">
-          <input
-            type="checkbox"
-            checked={isSurvey}
-            onChange={(e) => setIsSurvey(e.target.checked)}
-            className="mr-2"
-          />
-          Χωρίς σωστή απάντηση / χωρίς βαθμολογία (ερωτηματολόγιο)
-        </label>
+        <input
+          type="checkbox"
+          checked={isSurvey}
+          onChange={(e) => setIsSurvey(e.target.checked)}
+          className="mr-2"
+        />
+        Χωρίς σωστή απάντηση / χωρίς βαθμολογία (ερωτηματολόγιο)
+      </label>
 
+      <label className="block text-sm font-semibold mb-1">Τίτλος Κουίζ:</label>
       <input
         type="text"
         value={title}
         onChange={e => setTitle(e.target.value)}
         placeholder="Τίτλος κουίζ"
-        className="w-full border p-2 mb-4 rounded"
+        className="w-full border p-2 mb-4 rounded placeholder:text-gray-500 dark:placeholder:text-gray-300"
       />
 
       <div className="border p-4 rounded mb-6">
         <h2 className="text-lg font-semibold mb-2">Προσθήκη Ερώτησης</h2>
 
+        <label className="block text-sm font-semibold mb-1">Εκφώνηση:</label>
         <textarea
-          className="w-full border p-2 rounded mb-2"
+          className="w-full border p-2 rounded mb-2 placeholder:text-gray-500 dark:placeholder:text-gray-300"
           rows={2}
           placeholder="Εκφώνηση ερώτησης"
           value={currentQuestion}
@@ -254,17 +264,16 @@ export default function CreateQuizPage() {
           {currentImageUrl && <img src={currentImageUrl} alt="Preview" className="mt-2 max-h-40 object-contain" />}
         </div>
 
-        
-
         {currentOptions.map((opt, index) => (
           <div key={index} className="flex items-start gap-2 mb-2">
             <div className="flex-grow">
+              <label className="block font-semibold text-sm mb-1 ">Επιλογή {index + 1}:</label>
               <input
                 type="text"
                 value={opt.text}
                 onChange={e => updateOptionText(e.target.value, index)}
-                className="w-full border p-2 rounded mb-1"
-                placeholder={`Απάντηση ${index + 1}`}
+                className="w-full border p-2 rounded mb-1 placeholder:text-gray-500 dark:placeholder:text-gray-300"
+                placeholder={`Επιλογή ${index + 1}`}
               />
               {(opt.tempPreviewUrl || opt.imageUrl) && (
                 <img src={opt.tempPreviewUrl || opt.imageUrl} alt={`Preview ${index + 1}`} className="max-h-32 mb-1" />
