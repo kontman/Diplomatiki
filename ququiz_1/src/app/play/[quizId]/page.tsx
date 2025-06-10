@@ -79,11 +79,16 @@ export default function PlayQuizPage() {
   }, [quizId])
 
   useEffect(() => {
+  const interval = setInterval(fetchQuiz, 5000)
+  return () => clearInterval(interval)
+}, [quizId])
+
+  useEffect(() => {
     const channel = supabase
       .channel(`quiz-${quizId}`)
       .on('postgres_changes', {
         event: 'UPDATE',
-        schema: 'realtime',
+        schema: 'public',
         table: 'quizzes',
         filter: `id=eq.${quizId}`
       }, () => {
