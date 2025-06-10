@@ -59,25 +59,35 @@ export default function PlayQuizPage() {
   }, [quiz?.title])
 
   const fetchQuiz = async () => {
-    const { data } = await supabase
-      .from('quizzes')
-      .select('id, title,short_id, questions, current_question_id, status, started')
-      .eq('id', quizId)
-      .single()
+  const { data } = await supabase
+    .from('quizzes')
+    .select('id, title,short_id, questions, current_question_id, status, started')
+    .eq('id', quizId)
+    .single()
 
-    if (data) {
-      setQuiz(data)
-      const current = data.questions.find((q: Question) => q.id === data.current_question_id)
-      setActiveQuestion(current || null)
+  if (data) {
+    setQuiz(data)
 
-       if (current?.id !== lastQuestionId) {
+    const current = data.questions.find((q: Question) => q.id === data.current_question_id) || null
+    setActiveQuestion(current)
+
+    // Μόνο αν άλλαξε η ερώτηση
+    if (current && current.id !== lastQuestionId) {
       setSelectedAnswer(null)
       setSubmitted(false)
       setWaiting(false)
-      setTimeLeft((current?.duration || 12) + 3)
-      setLastQuestionId(current?.id || null)
+      setTimeLeft((current.duration || 12) + 3)
+      setShowOptions(false)
+
+      setTimeout(() => {
+        setShowOptions(true)
+      }, 3000)
+
+      setLastQuestionId(current.id)
     }
-  } }
+  }
+}
+
 
   useEffect(() => {
     if (quizId) fetchQuiz()
@@ -262,28 +272,9 @@ useEffect(() => {
   
 }, [quiz?.id, quiz?.status, playerCode]);
 
-useEffect(() => {
-  if (!activeQuestion?.id) return;
 
-  // Αν δεν άλλαξε ερώτηση, μην ξανατρέχει
-  if (activeQuestion.id === lastQuestionId) return;
 
-  setLastQuestionId(activeQuestion.id);
-  setShowOptions(false);
 
-  const timeout = setTimeout(() => {
-    setShowOptions(true);
-  }, 3000);
-
-  return () => clearTimeout(timeout);
-}, [activeQuestion?.id])
-
-useEffect(() => {
-  if (activeQuestion?.id && activeQuestion.id !== previousQuestionId) {
-    setTimeLeft(activeQuestion.duration + 3)
-    setPreviousQuestionId(activeQuestion.id)
-  }
-}, [activeQuestion])
 
 
 
