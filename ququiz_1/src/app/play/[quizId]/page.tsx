@@ -83,7 +83,7 @@ export default function PlayQuizPage() {
       .channel(`quiz-${quizId}`)
       .on('postgres_changes', {
         event: 'UPDATE',
-        schema: 'public',
+        schema: 'realtime',
         table: 'quizzes',
         filter: `id=eq.${quizId}`
       }, () => {
