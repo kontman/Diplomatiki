@@ -56,7 +56,7 @@ export default function HostManagePage() {
         setQuiz(data)
         const index = data.questions.findIndex((q: Question) => q.id === data.current_question_id)
         setCurrentQuestionIndex(index >= 0 ? index : null)
-        if (index >= 0) setTimeLeft(data.questions[index].duration || 15)
+        if (index >= 0) setTimeLeft(data.questions[index].duration+3 || 15)
       }
     }
     fetchQuiz()
@@ -117,7 +117,7 @@ export default function HostManagePage() {
     setCurrentQuestionIndex(nextIndex)
     setShowAnswers(false)
     setStats([])
-    setTimeLeft(quiz.questions[nextIndex].duration || 15)
+    setTimeLeft(quiz.questions[nextIndex].duration+3 || 15)
   }
 
   const fetchAnswerStats = async () => {
@@ -179,7 +179,7 @@ export default function HostManagePage() {
             Ερώτηση {currentQuestionIndex! + 1} / {quiz.questions.length}
           </p>
           <p className="text-gray-700 mb-2">{question.questionText}</p>
-          <p className="text-sm text-gray-500 mb-2">Χρόνος: {timeLeft}s</p>
+          <p className="text-sm text-gray-500 mb-2">Χρόνος: {timeLeft}s</p> 
 
           {question.imageUrl && (
             <img src={question.imageUrl} alt="Εικόνα" className="max-h-64 mb-3 object-contain" />

@@ -17,6 +17,7 @@ interface Question {
   correctIndex: number
   duration: number
   imageUrl?: string
+  isSurvey?: boolean
 }
 
 interface Quiz {
@@ -43,6 +44,8 @@ export default function PlayQuizPage() {
   const [correctCount, setCorrectCount] = useState<number | null>(null)
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [score, setScore] = useState<number | null>(null)
+  const [showOptions, setShowOptions] = useState(false);
+
 
 
   const router = useRouter()
@@ -67,7 +70,7 @@ export default function PlayQuizPage() {
       setSelectedAnswer(null)
       setSubmitted(false)
       setWaiting(false)
-      setTimeLeft(current?.duration || 15)
+      setTimeLeft(current?.duration+3 || 15)
     }
   } 
 
@@ -249,13 +252,26 @@ useEffect(() => {
   
 }, [quiz?.id, quiz?.status, playerCode]);
 
+useEffect(() => {
+  if (activeQuestion) {
+    setShowOptions(false); // Απόκρυψη αρχικά
+    const timeout = setTimeout(() => {
+      setShowOptions(true); // Εμφάνιση μετά από 3"
+    }, 3000);
+
+    return () => clearTimeout(timeout); // cleanup
+  }
+}, [activeQuestion]);
+
 
 
   if (!quiz || !playerCode) return <p className="p-6">Φόρτωση...</p>
+  const isSurvey = quiz.questions?.[0]?.isSurvey;
+
 
 // ✅ Αν το κουίζ τελείωσε, δείξε σκορ
 if (quiz.status === 'finished' && correctCount !== null) {
-  if (score === null) {
+  if (score === null ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-emerald-100 dark:bg-emerald-900">
         <p className="text-center text-lg font-medium text-gray-900 dark:text-white">
@@ -266,6 +282,11 @@ if (quiz.status === 'finished' && correctCount !== null) {
   }
 
   return (
+  isSurvey ? (
+    <div className="p-6 text-center text-blue-600 font-semibold">
+      📋 Ολοκλήρωσες το ερωτηματολόγιο! Ευχαριστούμε για τη συμμετοχή σου.
+    </div>
+  ) : (
     <div>
       <p className="p-6 text-center text-green-700 font-semibold">
         🏁 Ολοκλήρωσες το κουίζ!
@@ -274,10 +295,12 @@ if (quiz.status === 'finished' && correctCount !== null) {
         Απάντησες σωστά σε {correctCount}/{totalCount} ερωτήσεις!
       </p>
       <p className="p-6 text-center text-green-700 font-semibold">
-        Συγχαρητήρια συγκέντρωσες {score} πόντους!
+        Συγχαρητήρια, συγκέντρωσες {score} πόντους!
       </p>
     </div>
   )
+)
+
 }
 
 // ✅ Αναμονή αν δεν υπάρχει ενεργή ερώτηση
@@ -296,20 +319,28 @@ if (!quiz.current_question_id || !activeQuestion) {
     }
 
   return (
-    <div className="min-h-screen  max-w-2xl mx-auto bg-emerald-100 dark:bg-emerald-900 text-gray-900 dark:text-white p-6">
+    <div className="min-h-screen  max-w mx-auto bg-emerald-300 dark:bg-emerald-900 text-gray-900 dark:text-white p-6">
       <h1 className="text-xl font-bold mb-4">{quiz.title}</h1>
        {activeQuestion && (
   <p className="text-lg font-medium mb-1">{activeQuestion.questionText}</p>
 )}
-      {activeQuestion?.options.map((opt, i) => (
+
+      {timeLeft !== null && (
+  <div className="text-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+    Υπολειπόμενος χρόνος: {timeLeft} δευτερόλεπτα
+  </div>
+)}
+
+
+      {showOptions && activeQuestion?.options.map((opt, i) => (
         <button
           key={i}
           disabled={submitted}
           onClick={() => handleAnswer(i)}
-          className={`w-full text-left px-4 py-2 border rounded flex flex-col items-start gap-2 ${
+          className={`w-full text-left px-5 py-2 border-2 border-black rounded flex flex-col items-start gap-2 m-2 ${
             submitted && i === selectedAnswer
-              ? 'bg-blue-100 border-blue-400 dark:bg-blue-900 dark:border-blue-500'
-              : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              ? 'bg-blue-200 border-blue-600 dark:bg-blue-900 dark:border-blue-500'
+              : 'hover:bg-blue-300 dark:hover:bg-gray-700'
           }`}
         >
           <span>{opt.text}</span>

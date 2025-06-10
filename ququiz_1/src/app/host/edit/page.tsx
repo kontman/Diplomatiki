@@ -313,6 +313,7 @@ export default function EditQuizPage() {
                 {q.imageUrl && (
                   <img src={q.imageUrl} alt="Ερώτηση" className="max-h-48 mt-2" />
                 )}
+                <p className="text-sm text-gray-500 mb-1">⏱ Χρόνος: {q.duration}s</p>
                 <ul className="pl-4 mt-2 list-disc">
                   {q.options.map((opt, i) => (
                     <li key={i} className={i === q.correctIndex ? 'text-green-600 font-bold' : ''}>{opt.text}</li>
