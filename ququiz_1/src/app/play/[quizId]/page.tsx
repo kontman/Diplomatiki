@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
+
 interface Option {
   text: string
   imageUrl?: string
@@ -41,6 +42,7 @@ export default function PlayQuizPage() {
   const [timeLeft, setTimeLeft] = useState(0)
   const [correctCount, setCorrectCount] = useState<number | null>(null)
   const [totalCount, setTotalCount] = useState<number | null>(null)
+  const [score, setScore] = useState<number | null>(null)
 
 
   const router = useRouter()
@@ -117,6 +119,8 @@ export default function PlayQuizPage() {
   const answeredCount = answers.length
   const totalCount = quiz.questions.length
 
+  
+
   if (answeredCount === totalCount) {
     let correct = 0
 
@@ -127,6 +131,21 @@ export default function PlayQuizPage() {
 
     setCorrectCount(correct)
     setTotalCount(totalCount)
+const { data: existingPlayer } = await supabase
+  .from('players')
+  .select('score')
+  .eq('quiz_id', quiz.id)
+  .eq('player_code', playerCode.trim())
+  .single()
+
+if (existingPlayer?.score === 0 || existingPlayer?.score === null) {
+  await supabase
+    .from('players')
+    .update({ score: correct })
+    .eq('quiz_id', quiz.id)
+    .eq('player_code', playerCode.trim())
+}
+
 
     setTimeout(() => {
       router.push(`/reviews?player=${playerCode}&quiz=${quiz.short_id}`)
@@ -146,7 +165,7 @@ export default function PlayQuizPage() {
           .maybeSingle()
 
         //console.log('Βρέθηκε εγγραφή:', playerRow, error)
-
+        
         if (playerRow && !playerRow.finished) {
           await supabase
             .from('players')
@@ -154,7 +173,7 @@ export default function PlayQuizPage() {
             .eq('quiz_id', quiz.id)
             .eq('player_code', playerCode.trim())
 
-        //  console.log('✅ Ενημερώθηκε ως finished:', quiz.id, playerCode.trim())
+          console.log('✅ Ενημερώθηκε ως finished:', quiz.id, playerCode.trim())
         }
       }
     }
@@ -191,6 +210,7 @@ export default function PlayQuizPage() {
       player_code: playerCode.trim(),
       selected_index: index
     })
+    //console.log('score υπολογίστηκε:', { correct, timeUsed, earned })
 
     if (earned > 0) {
       await supabase.rpc('award_score', {
@@ -201,89 +221,102 @@ export default function PlayQuizPage() {
     }
   }
 
-  const [score, setScore] = useState<number | null>(null)
+  
 
 useEffect(() => {
+  if (!quiz || !playerCode || quiz.status !== 'finished') return;
+
   const fetchPlayerScore = async () => {
-    if (!quiz || !playerCode) return
     const { data, error } = await supabase
       .from('players')
       .select('score')
       .eq('quiz_id', quiz.id)
       .eq('player_code', playerCode.trim())
-      .single()
+      .single();
 
-    if (data?.score !== undefined) {
-      setScore(data.score)
+    //console.log("Fetched score:", data?.score, "error:", error);
+
+    if (typeof data?.score === 'number') {
+      setScore(data.score);
     }
-  }
+    else {
+      // Προσπάθησε ξανά μετά από λίγο
+      setTimeout(fetchPlayerScore, 500); // ή 1000ms
+    }
+  };
 
-  if (quiz?.status === 'finished') {
-    fetchPlayerScore()
-  }
-}, [quiz?.status])
+  fetchPlayerScore();
+  
+}, [quiz?.id, quiz?.status, playerCode]);
+
 
 
   if (!quiz || !playerCode) return <p className="p-6">Φόρτωση...</p>
-  if (!quiz.current_question_id) {
-    if (!quiz.current_question_id) {
-      if (quiz.status === 'finished' && correctCount !== null) {
-        return (
-          <div>
-          <p className="p-6 text-center text-green-700 font-semibold">
-                         🏁 Ολοκλήρωσες το κουίζ! </p>
-            <p className="p-6 text-center text-green-700 font-semibold"> 
-            Απάντησες σωστά σε {correctCount}/{totalCount} ερωτήσεις!
-          </p>
-          <p className="p-6 text-center text-green-700 font-semibold"> 
-            Συγχαρητήρια συγκέντρωσες {score ?? '...'} πόντους!
-          </p>
-          </div>
-        )
-      }
 
-      if (!quiz.started) {
-        return <div className="min-h-screen bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center">
-            <p className="text-center text-lg font-medium text-gray-900 dark:text-white">
-                Αναμονή για έναρξη από τον host...
-             </p>
-              </div>
-        
-      }
+// ✅ Αν το κουίζ τελείωσε, δείξε σκορ
+if (quiz.status === 'finished' && correctCount !== null) {
+  if (score === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-emerald-100 dark:bg-emerald-900">
+        <p className="text-center text-lg font-medium text-gray-900 dark:text-white">
+          Υπολογισμός σκορ...
+        </p>
+      </div>
+    )
+  }
 
-      return <div className="min-h-screen bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center">
-            <p className="text-center text-lg font-medium text-gray-900 dark:text-white">
-                Αναμονή για την επόμενη ερώτηση...
-             </p>
-              </div>
-    }}
+  return (
+    <div>
+      <p className="p-6 text-center text-green-700 font-semibold">
+        🏁 Ολοκλήρωσες το κουίζ!
+      </p>
+      <p className="p-6 text-center text-green-700 font-semibold">
+        Απάντησες σωστά σε {correctCount}/{totalCount} ερωτήσεις!
+      </p>
+      <p className="p-6 text-center text-green-700 font-semibold">
+        Συγχαρητήρια συγκέντρωσες {score} πόντους!
+      </p>
+    </div>
+  )
+}
+
+// ✅ Αναμονή αν δεν υπάρχει ενεργή ερώτηση
+if (!quiz.current_question_id || !activeQuestion) {
+  return (
+    <div className="min-h-screen bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center">
+      <p className="text-center text-lg font-medium text-gray-900 dark:text-white">
+        {quiz.started
+          ? 'Αναμονή για την επόμενη ερώτηση...'
+          : 'Αναμονή για έναρξη από τον host...'}
+      </p>
+    </div>
+  )
+
+
+    }
 
   return (
     <div className="min-h-screen  max-w-2xl mx-auto bg-emerald-100 dark:bg-emerald-900 text-gray-900 dark:text-white p-6">
       <h1 className="text-xl font-bold mb-4">{quiz.title}</h1>
-      <p className="text-lg font-medium mb-1">{activeQuestion!.questionText}</p>
-      {activeQuestion!.imageUrl && (
-        <img src={activeQuestion!.imageUrl} className="max-h-64 object-contain mb-3" alt="Ερώτηση" />
-      )}
+       {activeQuestion && (
+  <p className="text-lg font-medium mb-1">{activeQuestion.questionText}</p>
+)}
+      {activeQuestion?.options.map((opt, i) => (
+        <button
+          key={i}
+          disabled={submitted}
+          onClick={() => handleAnswer(i)}
+          className={`w-full text-left px-4 py-2 border rounded flex flex-col items-start gap-2 ${
+            submitted && i === selectedAnswer
+              ? 'bg-blue-100 border-blue-400 dark:bg-blue-900 dark:border-blue-500'
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+        >
+          <span>{opt.text}</span>
+          {opt.imageUrl && <img src={opt.imageUrl} className="max-h-32 object-contain" alt="" />}
+        </button>
+      ))}
 
-      <p className="text-sm text-gray-500 mb-3">Χρόνος: {timeLeft}s</p>
-
-      <div className="space-y-2">
-        {activeQuestion!.options.map((opt, i) => (
-          <button
-            key={i}
-            disabled={submitted}
-            onClick={() => handleAnswer(i)}
-            className={`w-full text-left px-4 py-2 border rounded flex flex-col items-start gap-2 ${
-              submitted && i === selectedAnswer ? 'bg-blue-100 border-blue-400: dark:bg-blue-900 dark:border-blue-500'
-        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            <span>{opt.text}</span>
-            {opt.imageUrl && <img src={opt.imageUrl} className="max-h-32 object-contain" alt="" />}
-          </button>
-        ))}
-      </div>
 
       {waiting && (
         <div className="mt-6 text-center text-blue-600 font-semibold">
@@ -291,11 +324,7 @@ useEffect(() => {
         </div>
       )}
 
-      {correctCount !== null && (
-        <div className="mt-6 text-center text-green-700 font-semibold">
-          🏁 Ολοκλήρωσες το κουίζ! Σωστές απαντήσεις: {correctCount}
-        </div>
-      )}
+      
     </div>
   )
 }

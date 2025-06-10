@@ -163,22 +163,31 @@ export default function CreateQuizPage() {
     }
 
     const shortId = Math.floor(1000 + Math.random() * 9000).toString()
-    const { error } = await supabase.from('quizzes').insert({
+    const { data, error } = await supabase.from('quizzes').insert({
       title,
       questions,
       short_id: shortId,
       status: 'waiting',
       started: false,
       host_id: userId,
-    })
+    }).select('id')
 
-    if (!error) {
-      localStorage.removeItem('quiz_progress')
-      router.push('/host')
-    } else {
-      console.error('❌ Σφάλμα δημιουργίας:', error)
-    }
+    if (error || !data?.[0]?.id) {
+    console.error('❌ Σφάλμα δημιουργίας:', error)
+    return
   }
+
+  const newQuizId = data[0].id
+
+  // 🔁 Επαναλαμβανόμενο update για να ενημερώσει σωστά το real-time
+  await supabase
+    .from('quizzes')
+    .update({ questions })
+    .eq('id', newQuizId)
+
+  localStorage.removeItem('quiz_progress')
+  router.push('/host')
+}
 
   const updateOptionText = (value: string, index: number) => {
     const updated = [...currentOptions]
