@@ -69,11 +69,15 @@ export default function PlayQuizPage() {
       setQuiz(data)
       const current = data.questions.find((q: Question) => q.id === data.current_question_id)
       setActiveQuestion(current || null)
+
+       if (current?.id !== lastQuestionId) {
       setSelectedAnswer(null)
       setSubmitted(false)
       setWaiting(false)
+      setTimeLeft((current?.duration || 12) + 3)
+      setLastQuestionId(current?.id || null)
     }
-  } 
+  } }
 
   useEffect(() => {
     if (quizId) fetchQuiz()
