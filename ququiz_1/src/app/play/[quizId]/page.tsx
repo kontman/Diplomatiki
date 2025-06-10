@@ -45,6 +45,7 @@ export default function PlayQuizPage() {
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [score, setScore] = useState<number | null>(null)
   const [showOptions, setShowOptions] = useState(false);
+  const [previousQuestionId, setPreviousQuestionId] = useState<string | null>(null)
 
 
 
@@ -268,8 +269,9 @@ useEffect(() => {
 }, [activeQuestion]);
 
 useEffect(() => {
-  if (activeQuestion) {
+  if (activeQuestion?.id && activeQuestion.id !== previousQuestionId) {
     setTimeLeft(activeQuestion.duration + 3)
+    setPreviousQuestionId(activeQuestion.id)
   }
 }, [activeQuestion])
 
