@@ -45,8 +45,6 @@ export default function PlayQuizPage() {
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [score, setScore] = useState<number | null>(null)
   const [showOptions, setShowOptions] = useState(false);
-  const [previousQuestionId, setPreviousQuestionId] = useState<string | null>(null)
-  const [lastQuestionId, setLastQuestionId] = useState<string | null>(null)
 
 
 
@@ -59,44 +57,26 @@ export default function PlayQuizPage() {
   }, [quiz?.title])
 
   const fetchQuiz = async () => {
-  const { data } = await supabase
-    .from('quizzes')
-    .select('id, title,short_id, questions, current_question_id, status, started')
-    .eq('id', quizId)
-    .single()
+    const { data } = await supabase
+      .from('quizzes')
+      .select('id, title,short_id, questions, current_question_id, status, started')
+      .eq('id', quizId)
+      .single()
 
-  if (data) {
-    setQuiz(data)
-
-    const current = data.questions.find((q: Question) => q.id === data.current_question_id) || null
-    setActiveQuestion(current)
-
-    // Μόνο αν άλλαξε η ερώτηση
-    if (current && current.id !== lastQuestionId) {
+    if (data) {
+      setQuiz(data)
+      const current = data.questions.find((q: Question) => q.id === data.current_question_id)
+      setActiveQuestion(current || null)
       setSelectedAnswer(null)
       setSubmitted(false)
       setWaiting(false)
-      setTimeLeft((current.duration || 12) + 3)
-      setShowOptions(false)
-
-      setTimeout(() => {
-        setShowOptions(true)
-      }, 3000)
-
-      setLastQuestionId(current.id)
+      setTimeLeft(current?.duration+3 || 15)
     }
-  }
-}
-
+  } 
 
   useEffect(() => {
     if (quizId) fetchQuiz()
   }, [quizId])
-
-  useEffect(() => {
-  const interval = setInterval(fetchQuiz, 5000)
-  return () => clearInterval(interval)
-}, [quizId])
 
   useEffect(() => {
     const channel = supabase
@@ -272,9 +252,16 @@ useEffect(() => {
   
 }, [quiz?.id, quiz?.status, playerCode]);
 
+useEffect(() => {
+  if (activeQuestion) {
+    setShowOptions(false); // Απόκρυψη αρχικά
+    const timeout = setTimeout(() => {
+      setShowOptions(true); // Εμφάνιση μετά από 3"
+    }, 3000);
 
-
-
+    return () => clearTimeout(timeout); // cleanup
+  }
+}, [activeQuestion]);
 
 
 
