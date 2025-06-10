@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function JoinPage() {
+function JoinPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -15,9 +15,7 @@ export default function JoinPage() {
   useEffect(() => {
     document.title = 'Join | Ququiz'
     const quizIdFromLink = searchParams.get('quizId')
-    if (quizIdFromLink) {
-      setShortId(quizIdFromLink)
-    }
+    if (quizIdFromLink) setShortId(quizIdFromLink)
   }, [searchParams])
 
   const handleJoin = async (e: React.FormEvent) => {
@@ -34,10 +32,8 @@ export default function JoinPage() {
       return
     }
 
-    // Αν έχει ήδη το quizId, χρησιμοποίησέ το απευθείας
     let quizId = shortId
 
-    // Αν είναι 4ψηφιο short ID, βρες το quizId
     if (shortId.length === 4) {
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
@@ -51,14 +47,13 @@ export default function JoinPage() {
       }
 
       if (quiz.status !== 'waiting') {
-    setError('Δεν μπορείς να συμμετάσχεις. Το κουίζ έχει ήδη ξεκινήσει ή ολοκληρωθεί.')
-    return
-  }
+        setError('Δεν μπορείς να συμμετάσχεις. Το κουίζ έχει ήδη ξεκινήσει ή ολοκληρωθεί.')
+        return
+      }
 
       quizId = quiz.id
     }
 
-    // Έλεγχος αν ήδη υπάρχει ο παίκτης
     const { data: existingPlayer } = await supabase
       .from('players')
       .select('id')
@@ -71,7 +66,6 @@ export default function JoinPage() {
       return
     }
 
-    // Δημιουργία παίκτη
     const { error: insertError } = await supabase
       .from('players')
       .insert({
@@ -91,54 +85,62 @@ export default function JoinPage() {
   }
 
   return (
-  <div className="min-h-screen flex items-center justify-center bg-purple-100 dark:bg-purple-900 px-4">
-    <div className="bg-purple-100 dark:bg-purple-900 p-10 rounded-xl  w-full max-w-md">
-      <h1 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
-        🎮 Συμμετοχή σε Quiz
-      </h1>
+    <div className="min-h-screen flex items-center justify-center bg-purple-100 dark:bg-purple-900 px-4">
+      <div className="bg-purple-100 dark:bg-purple-900 p-10 rounded-xl w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-white">
+          🎮 Συμμετοχή σε Quiz
+        </h1>
 
-      <form onSubmit={handleJoin} className="space-y-5">
-        <div>
-          <label className="block mb-1 text-gray-700 dark:text-gray-300 font-medium">
-            Κωδικός Quiz:
-          </label>
-          <input
-            type="text"
-            value={shortId}
-            onChange={(e) => setShortId(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-            maxLength={4}
-          />
-        </div>
+        <form onSubmit={handleJoin} className="space-y-5">
+          <div>
+            <label className="block mb-1 text-gray-700 dark:text-gray-300 font-medium">
+              Κωδικός Quiz:
+            </label>
+            <input
+              type="text"
+              value={shortId}
+              onChange={(e) => setShortId(e.target.value)}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              maxLength={4}
+            />
+          </div>
 
-        <div>
-          <label className="block mb-1 text-gray-700 dark:text-gray-300 font-medium">
-            Όνομα Παίκτη (7 ψηφία):
-          </label>
-          <input
-            type="text"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-            maxLength={7}
-          />
-        </div>
+          <div>
+            <label className="block mb-1 text-gray-700 dark:text-gray-300 font-medium">
+              Όνομα Παίκτη (7 ψηφία):
+            </label>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              maxLength={7}
+            />
+          </div>
 
-        {error && (
-          <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-        )}
+          {error && (
+            <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+          )}
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition"
-        >
-          Συμμετοχή
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition"
+          >
+            Συμμετοχή
+          </button>
+        </form>
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
+// ✅ This is the new wrapper with Suspense
+export default function JoinPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center">Φόρτωση...</div>}>
+      <JoinPage />
+    </Suspense>
+  )
 }
