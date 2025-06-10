@@ -46,6 +46,7 @@ export default function PlayQuizPage() {
   const [score, setScore] = useState<number | null>(null)
   const [showOptions, setShowOptions] = useState(false);
   const [previousQuestionId, setPreviousQuestionId] = useState<string | null>(null)
+  const [lastQuestionId, setLastQuestionId] = useState<string | null>(null)
 
 
 
@@ -258,15 +259,20 @@ useEffect(() => {
 }, [quiz?.id, quiz?.status, playerCode]);
 
 useEffect(() => {
-  if (activeQuestion) {
-    setShowOptions(false); // Απόκρυψη αρχικά
-    const timeout = setTimeout(() => {
-      setShowOptions(true); // Εμφάνιση μετά από 3"
-    }, 3000);
+  if (!activeQuestion?.id) return;
 
-    return () => clearTimeout(timeout); // cleanup
-  }
-}, [activeQuestion]);
+  // Αν δεν άλλαξε ερώτηση, μην ξανατρέχει
+  if (activeQuestion.id === lastQuestionId) return;
+
+  setLastQuestionId(activeQuestion.id);
+  setShowOptions(false);
+
+  const timeout = setTimeout(() => {
+    setShowOptions(true);
+  }, 3000);
+
+  return () => clearTimeout(timeout);
+}, [activeQuestion?.id])
 
 useEffect(() => {
   if (activeQuestion?.id && activeQuestion.id !== previousQuestionId) {
