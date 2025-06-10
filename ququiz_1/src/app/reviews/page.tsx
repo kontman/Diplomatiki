@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
-
-export default function VotePage() {
+function VotePageContent() {
   const searchParams = useSearchParams()
   const [playerCode, setPlayerCode] = useState(searchParams.get('player') || '')
   const [quizCode, setQuizCode] = useState(searchParams.get('quiz') || '')
@@ -53,10 +52,7 @@ export default function VotePage() {
       setError('Δεν βρέθηκε παίκτης με αυτό τον κωδικό για το συγκεκριμένο quiz.')
       return
     }
-console.log('📌 Εισαγωγή σχολίου για quiz ID:', quiz.id,playerCode,quizCode,comment)
-console.table({ player_code: playerCode, quiz_code: quizCode, quiz_id: quiz.id, comment })
 
-    
     const { error: insertError } = await supabase.from('reviews').insert({
       player_code: playerCode,
       quiz_code: quizCode,
@@ -114,5 +110,13 @@ console.table({ player_code: playerCode, quiz_code: quizCode, quiz_id: quiz.id, 
         Υποβολή
       </button>
     </div>
+  )
+}
+
+export default function VotePage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center">Φόρτωση αξιολόγησης...</div>}>
+      <VotePageContent />
+    </Suspense>
   )
 }
