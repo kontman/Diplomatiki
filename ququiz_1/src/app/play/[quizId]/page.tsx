@@ -70,7 +70,6 @@ export default function PlayQuizPage() {
       setSelectedAnswer(null)
       setSubmitted(false)
       setWaiting(false)
-      setTimeLeft(current?.duration+3 || 15)
     }
   } 
 
@@ -267,6 +266,12 @@ useEffect(() => {
     return () => clearTimeout(timeout); // cleanup
   }
 }, [activeQuestion]);
+
+useEffect(() => {
+  if (activeQuestion) {
+    setTimeLeft(activeQuestion.duration + 3)
+  }
+}, [activeQuestion])
 
 
 
