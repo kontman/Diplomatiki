@@ -321,9 +321,19 @@ if (!quiz.current_question_id || !activeQuestion) {
   return (
     <div className="min-h-screen  max-w mx-auto bg-emerald-300 dark:bg-emerald-900 text-gray-900 dark:text-white p-6">
       <h1 className="text-xl font-bold mb-4">{quiz.title}</h1>
-       {activeQuestion && (
-  <p className="text-lg font-medium mb-1">{activeQuestion.questionText}</p>
+      {activeQuestion && (
+  <>
+    <p className="text-lg font-medium mb-1">{activeQuestion.questionText}</p>
+    {activeQuestion.imageUrl && (
+      <img
+        src={activeQuestion.imageUrl}
+        alt="Εικόνα ερώτησης"
+        className="max-h-64 mx-auto mb-4 object-contain"
+      />
+    )}
+  </>
 )}
+
 
       {timeLeft !== null && (
   <div className="text-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
