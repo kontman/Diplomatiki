@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Ανάπτυξη Διαδικτυακής Εκπαιδευτικής Πλατφόρμας για Απάντηση Ερωτήσεων
 
-## Getting Started
+Υπεύθυνος καθηγητής: Σγάρμπας Κυριάκος
 
-First, run the development server:
+Η παρούσα διπλωματική εργασία παρουσιάζει τη σχεδίαση και την υλοποίηση της διαδικτυακής πλατφόρμας «Ququiz», ενός προηγμένου συστήματος quiz που υποστηρίζει πολλαπλούς παίκτες και συγχρονισμένη απάντηση σε ερωτήσεις σε πραγματικό χρόνο. Η πλατφόρμα σχεδιάστηκε με στόχο να προσφέρει μια διαδραστική, άμεση και ευέλικτη εμπειρία quiz, κατάλληλη τόσο για εκπαιδευτικά όσο και για ψυχαγωγικά περιβάλλοντα. Το ququiz απευθύνεται σε χρήστες που επιθυμούν να οργανώσουν ή να συμμετάσχουν σε quiz με έμφαση στη ροή και στον συγχρονισμό, όπου η κάθε ερώτηση εμφανίζεται ταυτόχρονα σε όλους τους συμμετέχοντες και απαντάται εντός προκαθορισμένου χρονικού πλαισίου.
+Η αρχιτεκτονική της εφαρμογής βασίζεται σε σύγχρονες τεχνολογίες του οικοσυστήματος JavaScript. Το frontend έχει υλοποιηθεί με Next.js, παρέχοντας γρήγορη απόκριση και δυναμική απόδοση περιεχομένου, ενώ για το backend χρησιμοποιείται το Supabase, που εξασφαλίζει real-time λειτουργικότητα, ασφάλεια και αποθήκευση δεδομένων με PostgreSQL. Η εφαρμογή ενσωματώνει WebSockets, subscriptions και remote procedure calls (RPC) για τον άμεσο συγχρονισμό ενεργειών μεταξύ host και παικτών. Η ροή του παιχνιδιού ελέγχεται αποκλειστικά από τον host, ο οποίος εκκινεί τις ερωτήσεις, παρακολουθεί τις απαντήσεις και παρουσιάζει στατιστικά κατά τη διάρκεια και στο τέλος του quiz.
+Ιδιαίτερη έμφαση δίνεται στη βελτιστοποίηση της εμπειρίας του χρήστη (UI/UX), καθώς και στη σταθερότητα και κλιμάκωση της εφαρμογής για πολλαπλούς συμμετέχοντες. Το σύστημα έχει δοκιμαστεί εκτενώς και προσφέρει δυνατότητες επεκτασιμότητας και παραμετροποίησης για διαφορετικά σενάρια χρήσης. Μέσω της μελέτης περίπτωσης του ququiz, αναδεικνύονται τεχνικές προκλήσεις, λύσεις σχεδιασμού real-time εφαρμογών και η εφαρμογή τους σε σύγχρονες ψηφιακές ανάγκες.
+Ο κώδικας της εφαρμογής βρίσκεται εδώ: https://github.com/kontman/Diplomatiki.git
+Βίντεο 3 Minute thesis μπορείτε να δείτε εδώ: https://youtu.be/vNQMTc-OxHI
+Βίντεο με αναλυτική παρουσίαση της πλατφόρμας: https://youtu.be/2vViLa6LypI
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Λέξεις κλειδιά: Διαδικτυακή Πλατφόρμα Ερωτήσεων, Διαχειριστής, Παίκτης, Next.js, Supabase, Real-time επικοινωνία
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Για την εγκατάσταση απαιτούνται:
+•	Node.js (έκδοση 18+)
+•	npm (περιλαμβάνεται με το Node)
+•	Git
+•	Λογαριασμός στο Supabase
+•	(Προαιρετικά) VS Code ή άλλο code editor
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+1.	Άνοιξε ένα τερματικό (Terminal).
+2.	Εκτέλεσε την εντολή:
+git clone https://github.com/kontman/Diplomatiki.git
+cd ququiz_1
 
-To learn more about Next.js, take a look at the following resources:
+3. Εκτέλεσε την εντολή:
+npm install
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4.  Συνδέσου στο Supabase.
+    Δημιούργησε νέο project.
+    Αντιγράψε τα κλειδιά SUPABASE_URL και SUPABASE_ANON_KEY.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5.  Στην ρίζα του project, δημιούργησε αρχείο .env.local με το εξής περιεχόμενο:
 
-## Deploy on Vercel
+    NEXT_PUBLIC_SUPABASE_URL= το link που θα βρείτε στο supabase
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+    Data API όπου βρίσκεται το project url (supabase_url)
+    API keys όπου αντιγράφετε το πάνω κλειδί (anon key)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+6.  Εκκίνηση Εφαρμογής
+    Στο terminal:
+    npm run dev
+    Η εφαρμογή θα τρέχει τοπικά στη διεύθυνση:    http://localhost:3000

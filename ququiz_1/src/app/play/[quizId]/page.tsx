@@ -70,7 +70,7 @@ export default function PlayQuizPage() {
       setSelectedAnswer(null)
       setSubmitted(false)
       setWaiting(false)
-      setTimeLeft(current?.duration+3 || 15)
+      setTimeLeft(current?.duration+3 || 15) //bazoume +3 epeidi exoume orisei kai ston paixti +3 sec delay prin tin emfanisi tis erotisis
     }
   } 
 
